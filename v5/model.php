@@ -7,7 +7,7 @@ use PDO;
 /**
  * database encapsulation class 
  * analyse relationships between tables reading mysql or postgree  INFORMATION_SCHEMA
- * 
+ * @todo extend PDO
  * @author gael jaunin
  *
  */
