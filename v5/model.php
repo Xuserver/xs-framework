@@ -27,7 +27,7 @@ class database{
     public $aOBJ = array("INTEGER", "INT", "BIGINT");
     public $aENUM = array("ENUM");
     
-    public function __construct($pdo="") {
+    public function __construct(PDO $pdo="") {
         $this->pdo=$pdo;
         $this->loadForeignKeys();
         //$this->loadRelations();
@@ -723,7 +723,9 @@ class model extends iteratorItem{
     public function db_index(){
         return $this->db_index;
     }
-    
+    /**
+     * return db id value
+     */
     public function db_id($set=""){
         if($set!=""){
             $this->db_id=$set;
