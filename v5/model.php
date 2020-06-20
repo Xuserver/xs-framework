@@ -27,10 +27,9 @@ class database{
     public $aOBJ = array("INTEGER", "INT", "BIGINT");
     public $aENUM = array("ENUM");
     
-    public function __construct(PDO $pdo="") {
+    public function __construct(\PDO $pdo=null) {
         $this->pdo=$pdo;
         $this->loadForeignKeys();
-        //$this->loadRelations();
     }
     
     /**
@@ -125,7 +124,7 @@ class database{
      * overrides pdo query method
      * @param string $stmt
      * @param string $stmt
-     * @return PDO unknown
+     * @return \PDO 
      */
     public function query(string $stmt){
         return $this->pdo->query($stmt);
@@ -191,7 +190,7 @@ class sql{
      *  string : comma separated list of fields
      * @return \xuserver\v5\sql
      */
-    public function select(string $list="__AUTO__") {
+    public function select( $list="__AUTO__") {
         
         if($list=="__AUTO__"){
             $this->_SELECT=array();
@@ -231,7 +230,7 @@ class sql{
      *  string : table name
      * @return \xuserver\v5\sql
      */
-    public function from(string $list="__AUTO__") {
+    public function from( $list="__AUTO__") {
         if($list=="__AUTO__"){
             $this->_FROM=$this->parent->db_tablename();
         }else{
@@ -627,10 +626,10 @@ class model extends iteratorItem{
             $this->db_id = $id;
             $sql_read=$this->sql()->statement_read();
             try {
-                $instance = $this->db->query($sql_read)->fetchObject();
+                $instance = $this->pdo->query($sql_read)->fetchObject();
                 $this->state("is_instance");
                 $this->val($instance);
-                $this->iterator()->empty();
+                $this->iterator()->reset();
                 $this->iterator()->attach($this);
             }catch(\PDOException $exception) {
                 $this->state("is_model");
@@ -643,7 +642,7 @@ class model extends iteratorItem{
                 $qry = $this->pdo->query($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
                 $this->state("is_selection");
-                $this->iterator()->empty();
+                $this->iterator()->reset();
                 foreach ($selection as $instance) {
                     $this->iterator()->attach($instance);
                 }
@@ -845,7 +844,7 @@ class iterator{
         unset($this->list[$prop->name()]);
         return $this;
     }
-    public function empty(){
+    public function reset(){
         $this->list=array();
         $this->selection=array();
         return $this;
@@ -1014,7 +1013,7 @@ class relation extends iteratorItem{
 class property extends iteratorItem{
     
     public $ui="";
-    public $parent="";
+    public $parent;
     protected $db_index ="";
     private $db_tablename="";
     
