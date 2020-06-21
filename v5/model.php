@@ -55,22 +55,6 @@ class database{
      * @param string $db_type
      */
     public function dbtype(property &$property, string $db_type){
-        /*
-         $start = strpos($db_type, '(');
-         $end = strpos($db_type, ')', $start + 1);
-         $found = substr($db_type, $start + 1, $end - $start - 1);
-         if ($start !== false) {
-         $db_type = strtoupper(substr($db_type, 0, $start));
-         if (is_numeric($found)) {
-         $property->attr("db_typelen",$found);
-         }else {
-         
-         }
-         }else{
-         $db_type = strtoupper($db_type);
-         }
-         */
-        
         $out=array();
         $found="";
         if(preg_match('/\((.*?)\)/', $db_type, $out)){
@@ -377,7 +361,7 @@ class sql{
             $html .= "</tr>";
         }
         $html.="</table>";
-        echo $html;
+        return $html;
     }
     
 }
@@ -459,10 +443,10 @@ class model extends iteratorItem{
     private $_state="is_virgin"; 
     
     /**
-     * create model on database 
+     * create model on database
      */
-    public function __construct($db="__AUTO__") {
-        if($db=="__AUTO__"){
+    public function __construct(database $db=null) {
+        if(is_null($db)){
             global $XUSERVER_DB;
             $this->pdo = &$XUSERVER_DB->pdo;
             $this->db = &$XUSERVER_DB;
@@ -626,7 +610,7 @@ class model extends iteratorItem{
             $this->db_id = $id;
             $sql_read=$this->sql()->statement_read();
             try {
-                $instance = $this->pdo->query($sql_read)->fetchObject();
+                $instance = $this->db->query($sql_read)->fetchObject();
                 $this->state("is_instance");
                 $this->val($instance);
                 $this->iterator()->reset();
@@ -639,7 +623,7 @@ class model extends iteratorItem{
         }else if ( $id=="__NULL__" ) {
             $sql_read=$this->sql()->statement_list();
             try {
-                $qry = $this->pdo->query($sql_read);
+                $qry = $this->db->query($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
                 $this->state("is_selection");
                 $this->iterator()->reset();

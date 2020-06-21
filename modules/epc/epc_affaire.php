@@ -8,19 +8,19 @@ class epc_affaire extends \xuserver\v5\model{
     public function popo(){
         return $this->properties()->find("affaire")->val();
     }
-    public function test(){
-
-        echo "<h2>FORM GENERATOR #".$this->db_tablename()."(".$this->db_id().")</h2>";
-        $t="ima,id,da,descr";
-        echo "<h3> find($t) </h3>";
-        $this->properties()->find($t)->each(function ($p) use($t){
-            echo "<div>".$p->name() . " (".$p->type().") ". $p->ui->input()."</div>";
-        });
+    public function form_test(){
+        $return ="";
+        $this->properties()->find("affaire,id,da,hta,moa_csps,moa_controleur_technique ")->each(function ($p) use(&$return){
+            $return .= "<div>".$p->name() . " (".$p->type().") ". $p->ui->input()."</div>";
+        })
+        ;
         
-        $this->relations()->find("da")->each(function ($p) use($t){
-            echo "<div>".$p->ui->input()."</div>";
-        });
-        return $this;
+        $this->relations()->find("epc")->each(function ($p) use(&$return){
+            $return.= "<div>".$p->ui->input()."</div>";
+        })
+        ;
+        $return="<div>$return</div>";
+        return $return;
     }
 }
 
