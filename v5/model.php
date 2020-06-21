@@ -87,7 +87,7 @@ class database{
             $property->type("text");
             
         }else if (in_array($db_type, $this->aENUM)) {
-            $property->select($found);
+            $property->values($found);
             
         }else if (in_array($db_type, $this->aBLOB)) {
             $property->type( "file");
@@ -136,6 +136,7 @@ class database{
 class sql{
     private $parent;
     private $_sqlstmt;
+    private $_sqltype="SELECT";
     private $_SELECT;
     private $_FROM;
     private $_JOIN;
@@ -143,7 +144,9 @@ class sql{
     private $_ORDERBY;
     private $_LIMIT;
     private $_OFFSET;
-        
+    
+    private $_SET;
+    
     public function __construct(model&$model) {
         $this->parent=$model;
         $this->reset();
@@ -155,6 +158,7 @@ class sql{
      * @return \xuserver\v5\sql
      */
     public function reset(){
+        
         $this->_SELECT=array();
         $this->_FROM="";
         $this->_JOIN=array();
@@ -162,6 +166,8 @@ class sql{
         $this->_ORDERBY=array();
         $this->_LIMIT="";
         $this->_OFFSET="";
+        
+        $this->_SET=array();
         return $this;
     }
     
@@ -175,6 +181,7 @@ class sql{
      * @return \xuserver\v5\sql
      */
     public function select( $list="__AUTO__") {
+        $this->_sqltype="SELECT";
         
         if($list=="__AUTO__"){
             $this->_SELECT=array();
@@ -240,34 +247,93 @@ class sql{
             $self=$this;
             $case = $self->parent->state() ;
             
-            if($case =="is_model" or $case =="is_selection" ){
-                $this->parent->properties()->each(function( property $prop) use(&$self){
-                    $value = $prop->val();
-                    if($prop->val()!=""){
-                        if($prop->type()=="checkbox"){
-                            $this->_WHERE[] = $this->parent->db_tablename().".". $prop->name()."=\"$value\"";
-                        }else{
-                            $this->_WHERE[] = $this->parent->db_tablename().".". $prop->name()." LIKE \"%$value%\"";
+            if($this->_sqltype=="SELECT" ){
+                
+                if($case =="is_model" or $case =="is_selection" ){
+                    $this->parent->properties()->each(function( property $prop) use(&$self){
+                        $value = $prop->val();
+                        if($prop->val()!=""){
+                            if($prop->type()=="checkbox" or $prop->type()=="number" or $prop->type()=="id"){
+                                $this->_WHERE[] = $this->parent->db_tablename().".". $prop->name()."=\"$value\"";
+                            }else{
+                                $this->_WHERE[] = $this->parent->db_tablename().".". $prop->name()." LIKE \"%$value%\"";
+                                
+                            }
                             
                         }
+                    });
                         
-                    }
-                });
+                }else if($case =="is_instance"){
+                    $this->_WHERE[] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
+                }else{
+                    
+                }
+                    
+            }else if($this->_sqltype=="UPDATE" ){
                 
-            }else if($case =="is_instance"){
-                $this->_WHERE[] = $this->parent->db_index()."=".$this->parent->db_id();
+                if($case =="is_model" or $case =="is_selection"  ){
+                    $this->parent->properties()->each(function( property $prop) use(&$self){
+                        $value = $prop->val();
+                        if($prop->val()!=""){
+                            if($prop->type()=="checkbox" or $prop->type()=="number" or $prop->type()=="id"){
+                                $this->_WHERE[] = $this->parent->db_tablename().".". $prop->name()."=\"$value\"";
+                            }else{
+                                $this->_WHERE[] = $this->parent->db_tablename().".". $prop->name()." LIKE \"%$value%\"";
+                                
+                            }
+                        }
+                    });
+
+                }else if($case =="is_instance"){
+                    $this->_WHERE[] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
+                }else{
+                    
+                }
             }else{
                 
             }
-            
         }else if($list==""){
             $this->_WHERE=array();
         }else{
             $this->_WHERE=explode(",", $list);
         }
-        
         return $this;
     }
+    
+    /*
+    public function and($list="__AUTO__"){
+        $this->_WHERE[] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
+        return $this;
+    }
+    */
+    public function update( $list="__AUTO__") {
+        /*
+         UPDATE table_name
+         SET column1 = value1, column2 = value2, ...
+         */
+        
+        $this->_sqltype="UPDATE";
+        if($list=="__AUTO__"){
+            $this->_SET=array();
+            $self=$this;
+            $this->parent->properties()->each(function( property $p) use(&$self){
+                $val = $p->val();
+                $self->_SET[]=$self->parent->db_tablename() . "." . $p->name() ." = '$val'" ;//= "'".$p->val()."'";
+                
+                
+            })
+            ;
+                $this->from();
+                $this->_LIMIT="";
+                $this->_OFFSET="";
+        }else if($list==""){
+            
+        }else{
+            $this->_SET=explode(",", $list);
+        }
+        return $this;
+    }
+    
     
     /**
      * offset sql clause
@@ -296,20 +362,38 @@ class sql{
         return $this;
     }
     
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /**
      * sql statement to read an instance of parent model  
      * @return string
      */
-    public function statement_read(){
-        $sql = $this->select()->where($this->parent->db_index()."=".$this->parent->db_id() )->statement();
+    public function statement_read_instance(){
+        $sql = $this->select()->where($this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id() )->statement();
         return $sql;
     }
     /**
      * sql statement to list model as a selection of instances that match certain where clause
      * @return string
      */
-    public function statement_list(){
+    public function statement_read_selection(){
         $sql = $this->select()->where()->statement();
+        return $sql;
+    }
+    
+    /**
+     * sql statement to update an instance of parent model
+     * @return string
+     */
+    public function statement_update(){
+        $sql = $this->update()->where( )->statement();
         return $sql;
     }
     
@@ -318,21 +402,35 @@ class sql{
      * @return string
      */
     public function statement(){
-        $_SELECT = implode(", ", $this->_SELECT);
-        $_JOIN = implode(" ", $this->_JOIN);
         
-        if(count($this->_WHERE)>0){
-            $_WHERE = " WHERE ".implode(" AND ", $this->_WHERE);
-        }else{
-            $_WHERE ="";
+        if($this->_sqltype=="SELECT"){
+            $_SELECT = implode(", ", $this->_SELECT);
+            $_JOIN = implode(" ", $this->_JOIN);
+            if(count($this->_WHERE)>0){
+                $_WHERE = " WHERE ".implode(" AND ", $this->_WHERE);
+            }else{
+                $_WHERE ="";
+            }
+            
+            if(count($this->_ORDERBY)>0){
+                $_ORDERBY = " ORDER BY ".implode(",", $this->_ORDERBY);
+            }else{
+                $_ORDERBY ="";
+            }
+            $this->_sqlstmt="SELECT $_SELECT FROM $this->_FROM $_JOIN $_WHERE $_ORDERBY $this->_LIMIT $this->_OFFSET";
+        }else if($this->_sqltype=="UPDATE"){
+            
+            $_SET = implode(", ", $this->_SET);
+            
+            if(count($this->_WHERE)>0){
+                $_WHERE = " WHERE ".implode(" AND ", $this->_WHERE);
+            }else{
+                $_WHERE ="";
+            }
+            
+            $this->_sqlstmt="UPDATE $this->_FROM SET $_SET $_WHERE ";
         }
         
-        if(count($this->_ORDERBY)>0){
-            $_ORDERBY = " ORDER BY ".implode(",", $this->_ORDERBY);
-        }else{
-            $_ORDERBY ="";
-        }
-        $this->_sqlstmt="SELECT $_SELECT FROM $this->_FROM $_JOIN $_WHERE $_ORDERBY $this->_LIMIT $this->_OFFSET";
         return $this->_sqlstmt;
     }
     
@@ -608,12 +706,12 @@ class model extends iteratorItem{
         // if $id given => build sql_read and instanciate object
         if ( is_int($id) ) {
             $this->db_id = $id;
-            $sql_read=$this->sql()->statement_read();
+            $sql_read=$this->sql()->statement_read_instance();
             try {
                 $instance = $this->db->query($sql_read)->fetchObject();
                 $this->state("is_instance");
                 $this->val($instance);
-                $this->iterator()->reset();
+                $this->iterator()->init();
                 $this->iterator()->attach($this);
             }catch(\PDOException $exception) {
                 $this->state("is_model");
@@ -621,12 +719,13 @@ class model extends iteratorItem{
                 //echo "<div>SQL $sql_read</div>";
             }
         }else if ( $id=="__NULL__" ) {
-            $sql_read=$this->sql()->statement_list();
+            $sql_read=$this->sql()->statement_read_selection();
+            
             try {
                 $qry = $this->db->query($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
                 $this->state("is_selection");
-                $this->iterator()->reset();
+                $this->iterator()->init();
                 foreach ($selection as $instance) {
                     $this->iterator()->attach($instance);
                 }
@@ -636,6 +735,22 @@ class model extends iteratorItem{
                 echo "<div><h1>ERROR model::read()<h1></div><div>$exception</div>";
                 //echo "<div>SQL $sql_read</div>";
             }
+        }else{
+            
+        }
+        
+        return $this;
+    }
+    
+    /**
+     * update model instance or selection
+     * @param mixed $values
+     */
+    public function update($values=null){
+        $sql_update=$this->sql()->statement_update();
+        
+        if(is_null($values)){
+            echo $sql_update;
         }else{
             
         }
@@ -710,6 +825,7 @@ class model extends iteratorItem{
      * return db id value
      */
     public function db_id($set=""){
+        
         if($set!=""){
             $this->db_id=$set;
             return $this;
@@ -774,7 +890,8 @@ class model extends iteratorItem{
 class iterator{
     private $list=array();
     private $selection=array();
-    private $parent="";
+    private $found=array();
+    protected $parent;
     private $_itemType="FETCH_ITERATORITEM";
     
     public function __construct(model &$model){
@@ -782,7 +899,6 @@ class iterator{
         
     }
     function __call($method, $arguments) {
-        
         
         //echo "Call method ".__CLASS__."->$method(".implode(', ',$arguments) .")";
         
@@ -828,9 +944,24 @@ class iterator{
         unset($this->list[$prop->name()]);
         return $this;
     }
-    public function reset(){
+    
+    /**
+     * initialise all arrays
+     * @return \xuserver\v5\iterator
+     */
+    public function init(){
         $this->list=array();
+        $this->reset();
+        return $this;
+    }
+    
+    /**
+     * initialise selection and found arrays
+     * @return \xuserver\v5\iterator
+     */
+    public function reset(){
         $this->selection=array();
+        $this->found=array();
         return $this;
     }
     
@@ -853,28 +984,47 @@ class iterator{
      * @param string $by name of the meta property on to search
      * @return \xuserver\v5\properties
      */
-    public function find($needle="__ALL__",$by="name"){
+    public function find($needle="__ALL__",$by="name",$reset=true){
         if($needle=="__ALL__"){
             $this->selection=$this->list;
-            return $this;
+
         }else if($needle==""){
-            return $this;
+            
         }else{
-            $this->selection=array();
+            if($reset){
+                $this->selection=array();
+            }
             $needle = explode(",", $needle);
             foreach ($this->list as &$p){
                 foreach ($needle as $value) {
+                    $value=trim($value);
                     if($value==""){
                         continue;
-                    }
-                    if(strpos($p->$by(), $value) !==false ){
-                        $this->selection[$p->name()]=$p;
+                    }else{
+                        if(strpos($value, "." ) ===0 or strpos($value, "!" ) ===0 ){// starting with "." or !
+                            if(".".$p->$by() == $value) {
+                                //echo "<h2> searching exact $value : ". $p->$by() . "</h2>";
+                                $this->selection[$p->name()]=$p;
+                                $this->found[$p->name()]=$p;
+                            }
+                        }else{
+                            if(strpos($p->$by(), $value) !==false ){
+                                //echo "<h2> searching like $value : ". $p->$by() . "</h2>";
+                                $this->selection[$p->name()]=$p;
+                                $this->found[$p->name()]=$p;
+                            }
+                        }
                     }
                 }
             }
-            return $this;
         }
+        return $this;
     }
+    public function found(){
+        $this->selection = $this->found;
+        return $this;
+    }
+    
     
     
     public function each($closure){
@@ -896,7 +1046,6 @@ class iterator{
             
         }else{
             foreach ($this->selection as $item){
-                //$closure="$closure()";
                 $item->load()->$closure();
             }
         }
@@ -956,6 +1105,19 @@ class relations extends iterator{
     }
 }
 class properties extends iterator{
+    
+    public function sqlSelect($list="__AUTO__"){
+        $this->parent->sql()->select($list);
+       return $this;
+    }
+    public function sqlUpdate($list="__AUTO__"){
+        $this->found()->parent->sql()->update();
+        return $this;
+    }
+    public function sqlWhere($list="__AUTO__"){
+        $this->found()->parent->sql()->where();
+        return $this;
+    }
     public function fieldset(){
         $this->each(function($p){
             echo $p->ui->row();
@@ -1097,7 +1259,7 @@ class property extends iteratorItem{
         }
     }
     
-    public function select($arr) {
+    public function values($arr) {
         $this->_type = "select";
         if (is_array($arr)) { //given an array of values
             $this->ui->_values = $arr;
@@ -1137,7 +1299,13 @@ class model_ui{
             $tbody .= "<tr>";
             $cnt++;
             $item->properties()->each(function($item1)use(&$tbody,&$cnt){
-                $tbody.="<td>".$item1->val()."</td>";
+                
+                if($item1->type()=="file"){
+                    $tbody.="<td>file</td>";
+                }else{
+                    $tbody.="<td>".$item1->val()."</td>";
+                }
+                
             });
             $tbody .= "</tr>";
             
