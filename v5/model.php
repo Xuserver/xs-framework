@@ -1288,7 +1288,7 @@ class model_ui{
         $thead = "<thead>";
         $tbody = "<tbody>";
         $thead .= "<tr>";
-        $cntspan = 0;
+        $cntspan = -1;
         $this->parent->properties()->each(function($item)use(&$thead,&$cntspan){
             $thead.="<th>".$item->name()."</th>";
             $cntspan++;
@@ -1313,7 +1313,7 @@ class model_ui{
             
         })
         ;
-        $tfoot = "<tr><td colspan='$cntspan'>$cnt rows found<td></tr>";
+            $tfoot = "<tr><td colspan='".($cntspan--)."'>$cnt rows found <td></tr>";
         return "<table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
     }
 }
@@ -1348,7 +1348,7 @@ class property_ui{
             $options="";
             
             if (is_array($this->_values)) { //given an array of values
-                
+                $options.="<option value=\"\" style=\"background: rgba(200, 200, 200, 0.5);font-style:italic\">...</option>";
                 if (array_keys(array_keys($this->_values)) !== array_keys($this->_values)) {
                     foreach ($this->_values as $i => $item) {
                         $selected="";
