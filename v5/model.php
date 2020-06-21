@@ -1107,11 +1107,13 @@ class relations extends iterator{
 class properties extends iterator{
     
     public function sqlSelect($list="__AUTO__"){
-        $this->parent->sql()->select($list);
+        $this->found()->parent->sql()->select($list);
+        $this->reset();
        return $this;
     }
     public function sqlUpdate($list="__AUTO__"){
         $this->found()->parent->sql()->update();
+        $this->reset();
         return $this;
     }
     public function sqlWhere($list="__AUTO__"){
