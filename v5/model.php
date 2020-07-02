@@ -9,11 +9,11 @@ namespace xuserver\v5;
 use PDO;
 
 function debug($s,$echo=false){
-    
+    $alert = "<div class='alert alert-warning'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button> $s </div>";
     if($echo){
-        echo "<div class='alert alert-warning'>$s</div>";
+        echo $alert;
     }else{
-        return "<div class='alert alert-warning'>$s</div>";
+        return $alert;
     }
     
 }
@@ -151,7 +151,7 @@ class sql{
     private $parent;
     private $_sqlstmt="";
     private $_sqltype="SELECT";
-    public $_SELECT;
+    private $_SELECT;
     private $_FROM;
     private $_JOIN;
     private $_WHERE;
@@ -165,6 +165,16 @@ class sql{
         $this->parent=$model;
         $this->reset();
     }
+    
+    
+    public function SQL_SELECT(){
+        return $this->_SELECT;
+    }
+    
+    public function SQL_WHERE(){
+        return $this->_WHERE;
+    }
+    
     
     /**
      * reset sql part
@@ -215,7 +225,7 @@ class sql{
                 }
                 // creating virtual properties
                 $NEW_MODEL->properties()->all(function( property $VIRTUAL) use(&$SQL, &$MODEL, &$EXTERNAL_TABLEALIAS, &$sametable){
-                    if($VIRTUAL->type()=="text"){
+                    if($VIRTUAL->type()=="text" and ! $VIRTUAL->virtual()){
                         $property = new property();
                         $alias = $EXTERNAL_TABLEALIAS. "_" . $VIRTUAL->name();
                         $property->name($alias);
@@ -266,10 +276,7 @@ class sql{
                 $SQL->_SELECT[$PROPERTY->name()]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." AS " . $PROPERTY->name();
             })->resetAll();
             ;
-            
-            $this->_LIMIT="";
-            $this->_OFFSET="";
-            
+                        
         }else if($list==""){
             $this->_SELECT=array();
         }else{
@@ -347,16 +354,15 @@ class sql{
             if($case =="is_instance"){
                 //$this->_WHERE["instance"] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
             }else{
-                $this->parent->properties()->each(function( property $prop) use(&$self,&$andor){
+                $this->parent->properties()->each(function( property $PROPERTY) use(&$self,&$andor){
+                    $value = $PROPERTY->val();
                     
-                    $value = $prop->val();
-                    
-                    if($prop->val()!=""){
+                    if($PROPERTY->val()!=""){
                         
-                        if($prop->type()=="checkbox" or $prop->type()=="number" or $prop->type()=="id"){
-                            $this->_WHERE[] = " AND " . $prop->db_tablename().".". $prop->realname()."=\"$value\"";
+                        if($PROPERTY->type()=="checkbox" or $PROPERTY->type()=="number" or $PROPERTY->type()=="id"){
+                            $this->_WHERE[$PROPERTY->name()] = " AND " . $PROPERTY->db_tablename().".". $PROPERTY->realname()."=\"$value\"";
                         }else{
-                            $this->_WHERE[] = " AND " . $prop->db_tablename().".". $prop->realname()." LIKE \"%$value%\"";
+                            $this->_WHERE[$PROPERTY->name()] = " AND " . $PROPERTY->db_tablename().".". $PROPERTY->realname()." LIKE \"%$value%\"";
                         }
                     }
                 })->resetAll();
@@ -476,7 +482,7 @@ class sql{
                     $_ORDERBY ="" ;
                 }
                 if(strpos($this->_LIMIT, "LIMIT") ===false ){
-                    $_LIMIT = "";
+                    $_LIMIT = "LIMIT 150";
                 }else{
                     $_LIMIT = $this->_LIMIT;
                 }
@@ -489,12 +495,14 @@ class sql{
             }
             
             if(count($this->_WHERE)>0){
-                $first = array_shift($this->_WHERE);
-                $first = preg_replace('/AND/', ' ', $first, 1);
-                array_unshift($this->_WHERE, $first);
-                
-                $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
-                //echo "<br/>$first  :  $_WHERE";
+                $firstkey = NULL;
+                foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
+                if (null === $firstkey) {
+                    $_WHERE="";
+                }else{
+                    $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
+                    $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
+                }
             }else{
                 $_WHERE ="";
             }
@@ -599,7 +607,7 @@ class sql{
  *
  */
 class model extends iteratorItem{
-    public $debug="";
+    private $__debug="";
     /**
      * sql class attached to the model
      * @todo rename to private var
@@ -691,9 +699,12 @@ class model extends iteratorItem{
     public function __set($name, $value){
         //echo "Setting '$name' to '$value'\n";
         $property = $this->_properties->byName($name);
-        $property->val($value);
-        $this->_properties->append($property);
-        
+        if($property==false){
+            $this->debug("Magic property <b>$name</b>  doens't exist");
+        }else{
+            $property->val($value);
+            $this->_properties->append($property);
+        }
     }
     
     /*
@@ -713,6 +724,18 @@ class model extends iteratorItem{
      */
     public function __invoke(){
         return $this->_iterator;
+    }
+    
+    function debug($m=""){
+        if( is_null($m) ){
+            $this->__debug = "";
+            return $this;
+        }else if($m==""){
+            return $this->__debug;
+        }else{
+            $this->__debug .= debug($m);
+            return $this;
+        }
     }
     
     /**
@@ -812,6 +835,7 @@ class model extends iteratorItem{
                 if($row["db_tablename"]==$this->db_tablename()){
                     $relation = new relation();
                     $relation->name($row["table"]);
+                    $relation->db_tablename($this->db_tablename());
                     $relation->type("relation");
                     $relation->val($row["index"]);
                     $this->relations()->attach($relation);
@@ -849,7 +873,7 @@ class model extends iteratorItem{
         if ( is_int($id) ) {
             $this->db_id = $id;
             $sql_read=$this->sql()->statement_read_instance();
-            
+            //$this->debug("model(is_instance).read($sql_read)");
             try {
                 $instance = $this->db->query($sql_read)->fetchObject();
                 $this->state("is_instance");
@@ -862,12 +886,8 @@ class model extends iteratorItem{
                 //echo "<div>SQL $sql_read</div>";
             }
         }else if ( $id=="__NULL__" ) {
-            
             $sql_read=$this->sql()->statement_read_selection();
-            //$this->properties()->resetAll()->selected(0);
-            
-            
-            $this->debug .= debug("model.read($sql_read)");
+            //$this->debug("model(is_selection).read($sql_read)");
             try {
                 $qry = $this->db->query($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
@@ -985,6 +1005,15 @@ class model extends iteratorItem{
         
     }
     
+    
+    
+    public function label(){
+        $label="";
+        $this->properties()->find("text","type")->each(function(property $prop)use(&$label){
+            $label .= " ". $prop->val();
+        });
+        return $label;
+    }
       
     public function val($values="__NULL__"){
         if(is_null($values) or $values=="__NULL__"){
@@ -1029,9 +1058,6 @@ class model extends iteratorItem{
                 }
             });
         }else{
-            $this->properties()->each(function(property $prop)use(&$values){
-                $prop->val($values);
-            });
         }
         
         return $this;
@@ -1053,9 +1079,6 @@ class iterator{
         
     }
     
-    function debug(){
-        return debug(count($this->list)." - ".count($this->selection));
-    }
     
     function __call($method, $arguments) {
         
@@ -1086,6 +1109,15 @@ class iterator{
         return $this;
         
     }
+    
+    public function model(){
+        return $this->parent;
+    }
+    
+    public function count(){
+        return count($this->list);
+    }
+    
     public function attach($item){
         $item->parent = &$this->parent;
         
@@ -1144,7 +1176,7 @@ class iterator{
             return $this;
         }
         if(! isset($this->list[$name])){
-            return $this;
+            return false;
         }
         return $this->list[$name];
     }
@@ -1196,6 +1228,8 @@ class iterator{
     
     
     public function append($item ){
+        
+        //echo "dd".$item->name();
         $this->selection[$item->name()]=$item;
         $this->found[$item->name()]=$item;
     }
@@ -1402,6 +1436,15 @@ class relation extends iteratorItem{
         $this->ui=new relation_ui($this);
     }
     
+    public function db_tablename($set="__NULL__"){
+        if($set!="__NULL__"){
+            $this->db_tablename=$set;
+            return $this;
+        }else{
+            return $this->db_tablename;
+        }
+    }
+    
     /**
      * tries to return a model instance corresponding to foreign key
      * @return \xuserver\v5\model
@@ -1457,18 +1500,30 @@ class property extends iteratorItem{
     }
     
     /**
-     * is propery selected in SELEC statement
-     * @param string $set
+     * is propery selected in SELECT statement
      * @return \xuserver\v5\property|number|string
      */
     public function is_selected(){
-        
-        if(isset($this->parent->sql()->_SELECT[$this->name()])){
+        if(isset($this->parent->sql()->SQL_SELECT()[$this->name()])){
             return 1;
         }else{
             return 0;
         }
     }
+    
+    /**
+     * is propery selected in WHERE statement
+     * @param string $set
+     * @return \xuserver\v5\property|number|string
+     */
+    public function is_where(){
+        if(isset($this->parent->sql()->SQL_WHERE()[$this->name()])){
+            return 1;
+        }else{
+            return 0;
+        }
+    }
+    
     public function realname($set="__NULL__"){
         if($set!="__NULL__"){
             $this->realname=$set;
@@ -1637,13 +1692,71 @@ class model_ui{
     public function __construct(model &$parent){
         $this->parent=$parent;
     }
-    function table(){
+    public function structure(){
+        $return="";
+        
+        
+        $sql = $this->parent->sql()->statement_current();
+        
+        $table="<tr><th colspan='6'><h2>model <u>".$this->parent->db_tablename()."</u></h2></th></tr>";
+        $table.="<tr><th>table :</th><td>".$this->parent->db_tablename()."</td><th>primary key :</th><td>".$this->parent->db_index()."</td><td></td></tr>";
+        $table.="<tr><th>value :</th><td>".$this->parent->db_id()."</td><th>state :</th><td>".$this->parent->state()."</td><td></td><td></td><td></td></tr>";
+
+        $lines="";
+        if($sql==""){
+            $sql="SQL clause is empty, model isn't built.";
+        }else{
+            if($this->parent->iterator()->count() >0){
+                /*
+                $this->parent->iterator()->all(function ($item) use (&$lines){
+                    $lines .= "<li>".$item->label()."</li>";
+                });
+                */
+            }else{
+                $lines="iterator is empty.";
+            }
+        }
+        
+        $table.="<tr><th><h3>>iterator :</h3></th><td>".$this->parent->iterator()->count()." elements</td><td colspan='4'></td></tr>";
+        $table.="<tr><td colspan='6'><code class='small'>$sql</code></td></tr>";
+        //$table.="<tr><td colspan='4'>$lines</td></tr>";
+        
+        $table.="<tr><th colspan='6'><h3>>properties :</h3></th></tr>";
+        $table.="<tr><th>name</th><th>value</th><th>type</th><th>table</th><th>selected</th><th>searched</th></tr>";
+        $lines="";
+        $this->parent->properties()->all(function (property $item) use (&$lines){
+            if($item->type()=="fk"){
+                $name="<a href=''>".$item->name()."</a>";
+            }else{
+                $name=$item->name();
+            }
+            if($item->is_selected()){$s="yes";}else{$s="";}
+            if($item->is_where()){$w="yes";}else{$w="";}
+            
+            $lines .= "<tr><td>$name</td><td>".$item->val()."</td><td>".$item->type()."</td><td>".$item->db_tablename()."</td><td>$s</td><td>$w</td></tr>";
+            
+        });
+        $table.=$lines;
+        
+        $table.="<tr><th colspan='6'><h3>>relations :</h3></th></tr>";
+        $lines="";
+        $this->parent->relations()->all(function (relation $item) use (&$lines){
+            $lines .= "<tr><td>".$item->name()."</td><td>".$item->val()."</td><td>".$item->type()."</td><td>".$item->db_tablename()."</td><td></td><td></td></tr>";
+        });
+        $table.=$lines;
+        $return .= "<h1>structure </h1><table class='table'>$table</table>";
+        return $return;
+    }
+    
+    
+    
+    
+    public function table(){
         $thead = "<thead>";
         $tbody = "<tbody>";
         $thead .= "<tr>";
         $cntspan = -1;
         $this->parent->properties()->each(function($prop)use(&$thead,&$cntspan){
-            
             if($prop->is_selected()){
                 $thead.="<th>".$prop->name()."</th>";
                 $cntspan++;
@@ -1670,10 +1783,9 @@ class model_ui{
         })
         ;
         
-        $sql = $this->parent->sql()->statement_current();
         $this->parent->properties()->reset();
         $tfoot = "<tr><td colspan='".($cntspan--)."'>$cnt rows found <td></tr>";
-        return "<code class='small'>$sql</code><table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
+        return "<table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
     }
 }
 
