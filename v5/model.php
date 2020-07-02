@@ -1699,8 +1699,8 @@ class model_ui{
         $sql = $this->parent->sql()->statement_current();
         
         $table="<tr><th colspan='6'><h2>model <u>".$this->parent->db_tablename()."</u></h2></th></tr>";
-        $table.="<tr><th>table :</th><td>".$this->parent->db_tablename()."</td><th>primary key :</th><td>".$this->parent->db_index()."</td><td></td></tr>";
-        $table.="<tr><th>value :</th><td>".$this->parent->db_id()."</td><th>state :</th><td>".$this->parent->state()."</td><td></td><td></td><td></td></tr>";
+        $table.="<tr><th>tablename :</th><td>".$this->parent->db_tablename()."</td><th>state :</th><td>".$this->parent->state()."</td><td></td><td></td></tr>";
+        $table.="<tr><th>primary key :</th><td>".$this->parent->db_index()."</td><th>value :</th><td>".$this->parent->db_id()."</td><td></td><td></td></tr>";
 
         $lines="";
         if($sql==""){
