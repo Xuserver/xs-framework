@@ -1787,6 +1787,15 @@ class model_ui{
         $tfoot = "<tr><td colspan='".($cntspan--)."'>$cnt rows found <td></tr>";
         return "<table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
     }
+    
+    public function form(){
+            
+        $return ="";
+        $this->parent->properties()->all(function ($p) use(&$return){
+            $return.=$p->ui->row();
+        });
+        return "<form>".$return."</form>";
+    }
 }
 
 
@@ -1806,6 +1815,11 @@ class property_ui{
     public function __construct(property &$parent){
         $this->parent=$parent;
     }
+    
+    public function formid(){
+        return $this->parent->name()."dd";
+        
+    }
     public function input(){
         $required ="";  $disabled ="";
         if ($this->parent->is("disabled")) {$disabled="disabled='disabled'";}
@@ -1813,9 +1827,9 @@ class property_ui{
         
         if ($this->parent->type() == "xhtml") {
             if ($this->parent->val() == "") {$xhtml = "";}else {$xhtml = $this->parent->val();}
-            $input = "<textarea $required $disabled rows='3' cols='50' autocomplete='false' name='".$this->parent->name()."'>" . ($xhtml) . "</textarea>";
+            $input = "<textarea class='form-control' $required $disabled rows='3' cols='50' autocomplete='false' name='".$this->parent->name()."' id='".$this->formid()."'>" . ($xhtml) . "</textarea>";
         }else if ($this->parent->type()=="select"){
-            $input = "<select name='".$this->parent->name()."' $required $disabled >";
+            $input = "<select name='".$this->parent->name()."' $required $disabled id='".$this->formid()."'>";
             $options="";
             
             if (is_array($this->_values)) { //given an array of values
@@ -1867,7 +1881,7 @@ class property_ui{
                 }else{
                     $CHECKED = "";
                 }
-                $input="<input type=\"".$this->parent->type()."\" $required $disabled $CHECKED name='".$this->parent->name()."' value=\"1\" placeholder=\"".$this->parent->comment()."\" />";
+                $input="<input class='form-check-input' type=\"".$this->parent->type()."\" $required $disabled $CHECKED name='".$this->parent->name()."' id='".$this->formid()."' value=\"1\" placeholder=\"".$this->parent->comment()."\" />";
             }
             
             /*
@@ -1881,13 +1895,38 @@ class property_ui{
             */
             
         }else{
-            $input="<input type=\"".$this->parent->type()."\" $required $disabled name='".$this->parent->name()."' value=\"".$this->parent->val()."\" placeholder=\"".$this->parent->comment()."\" />";
+            $input="<input class='form-control' type=\"".$this->parent->type()."\" $required $disabled name='".$this->parent->name()."' id='".$this->formid()."' value=\"".$this->parent->val()."\" placeholder=\"".$this->parent->comment()."\" />";
         }
         return $input;
     }
     
     public function row(){
-        return "<div>".$this->parent->type()." ".$this->parent->name()." ".$this->input()." </div>";
+        $p = $this->parent;
+        if($p->type()=="checkbox"){
+            $classlabel="form-check-label";
+            $classdiv="form-check";
+            return "
+            <div class='form-group $classdiv'>
+                <label class='form-group $classlabel' for='".$this->formid()."'>
+                ".$p->ui->input()." ".$p->name()."
+                </label>
+                <small class='form-text text-muted'>".$p->comment()."</small>
+            </div>"; 
+        }else{
+            $classlabel="";
+            $classdiv="";
+            return "
+            <div class='form-group $classdiv'>
+                <label class='form-group $classlabel' for='".$this->formid()."'>".$p->name()."</label>
+                ".$p->ui->input()."
+                <small class='form-text text-muted'>".$p->comment()."</small>
+            </div>"; 
+        }
+        
+        
+           
+        
+        //return "<div>".$this->parent->type()." ".$this->parent->name()." ".$this->input()." </div>";
     }
     
 }
