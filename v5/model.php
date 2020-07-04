@@ -276,7 +276,8 @@ class sql{
                 $SQL->_SELECT[$PROPERTY->name()]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." AS " . $PROPERTY->name();
             })->resetAll();
             ;
-                        
+            $this->parent->properties()->sort($SQL->_SELECT);
+            
         }else if($list==""){
             $this->_SELECT=array();
         }else{
@@ -1203,11 +1204,15 @@ class iterator{
                     if($value==""){
                         continue;
                     }else{
-                        if(strpos($value, "." ) ===0 or strpos($value, "!" ) ===0 ){// starting with "." or !
+                        if(strpos($value, "." ) ===0 or strpos($value, "#" ) ===0 ){// starting with "." or !
                             if(".".$p->$by() == $value) {
                                 //echo "<h2> searching exact $value : ". $p->$by() . "</h2>";
                                 $this->append($p);
+                            }else if("#".$p->$by() == $value) {
+                                //echo "<h2> searching exact $value : ". $p->$by() . "</h2>";
+                                $this->append($p);
                             }
+                            
                         }else{
                             if(strpos($p->$by(), $value) !==false ){
                                 //echo "<h2> searching like $value : ". $p->$by() . "</h2>";
@@ -1296,10 +1301,29 @@ class iterator{
     }
     
     
-    function sort(){
-        ksort($this->list);
-        ksort($this->selection);
-        ksort($this->found);
+    function sort($order=""){
+        
+        if( is_array($order)){
+            
+            $ordered = array();
+            foreach ($order as $key => $val) {
+                if (array_key_exists($key, $this->list)) {
+                    $ordered[$key] = $this->list[$key];
+                    unset($this->list[$key]);
+                }
+            }
+            $this->list= $ordered + $this->list;
+            
+            
+        }else if($order!="ksort"){
+            
+        }else{
+            ksort($this->list);
+            ksort($this->selection);
+            ksort($this->found);
+        }
+        
+        
         return $this;
     }
 }
@@ -1756,6 +1780,7 @@ class model_ui{
         $tbody = "<tbody>";
         $thead .= "<tr>";
         $cntspan = -1;
+         
         $this->parent->properties()->each(function($prop)use(&$thead,&$cntspan){
             if($prop->is_selected()){
                 $thead.="<th>".$prop->name()."</th>";
@@ -1791,8 +1816,11 @@ class model_ui{
     public function form(){
             
         $return ="";
-        $this->parent->properties()->all(function ($p) use(&$return){
-            $return.=$p->ui->row();
+        
+        $this->parent->properties()->each(function ($prop) use(&$return){
+            if($prop->is_selected()){
+                $return.=$prop->ui->row();
+            }
         });
         return "<form>".$return."</form>";
     }
