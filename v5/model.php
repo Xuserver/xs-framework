@@ -1822,7 +1822,7 @@ class model_ui{
                 $return.=$prop->ui->row();
             }
         });
-        return "<form>".$return."</form>";
+        return "<form method='post'>".$return."<div><input type='submit' value='update' name='model_update' /></div></form>";
     }
 }
 
