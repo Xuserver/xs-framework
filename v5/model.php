@@ -83,7 +83,7 @@ class database{
         }
         
         if (in_array($db_type, $this->aKEY)) {
-            $property->type("id");
+            $property->type("pk");
             
         }else if (in_array($db_type, $this->aBOOL)) {
             $property->type ("checkbox");
@@ -278,7 +278,7 @@ class sql{
             ;
             $this->parent->properties()->sort($SQL->_SELECT);
             
-        }else if($list==""){
+        }else if(is_null($list)){
             $this->_SELECT=array();
         }else{
             $this->_SELECT=explode(", ", $list);
@@ -290,54 +290,11 @@ class sql{
         return $this;
         
     }
-    /**
-     * from sql clause
-     * @param string $list
-     *  __AUTO__ : in automatic mode the field list is created using model properties
-     *  string : table name
-     * @return \xuserver\v5\sql
-     */
-    public function from( $list="__AUTO__") {
-        if($list=="__AUTO__"){
-            //$this->_FROM=$this->parent->db_tablename();
-            /*
-            $SQL=$this;
-            $SQL->_JOIN=array();
-            $MODEL=$SQL->parent;
-            $SQL->parent->properties()->each(function( property $PROPERTY) use(&$SQL,$MODEL){
-                if($PROPERTY->type()=="fk"){
-                    if($PROPERTY->fk_tablename()==$PROPERTY->db_tablename()){
-                        // jointure vers la même table
-                        $TABLENAME = $PROPERTY->db_tablename() ; // epc_affaire
-                        $FOREIGNKEYNAME = $PROPERTY->name(); // epc_programme
-                        $EXTERNAL_TABLENAME = $PROPERTY->db_tablename() ; // epc_affaire
-                        $EXTERNAL_TABLEALIAS = $FOREIGNKEYNAME;
-                        $EXTERNAL_TABLEKEY = $PROPERTY->fk_index(); // id_affaire
-                        $SQL->_JOIN[]= " LEFT JOIN $EXTERNAL_TABLENAME AS $EXTERNAL_TABLEALIAS ON $TABLENAME.$FOREIGNKEYNAME = $EXTERNAL_TABLEALIAS.$EXTERNAL_TABLEKEY";
-                    }else{
-                        // jointure vers une autre table
-                        $TABLENAME= $MODEL->db_tablename(); // epc_affaire
-                        $FOREIGNKEYNAME= $PROPERTY->name(); // moa_cdp
-                        $EXTERNAL_TABLENAME = $PROPERTY->fk_tablename(); // auth_user
-                        $EXTERNAL_TABLEALIAS = $FOREIGNKEYNAME; // moa_cdp
-                        $EXTERNAL_TABLEKEY = $PROPERTY->fk_index(); // id_user
-                        $SQL->_JOIN[]= " LEFT JOIN $EXTERNAL_TABLENAME ON $TABLENAME.$FOREIGNKEYNAME = $EXTERNAL_TABLENAME.$EXTERNAL_TABLEKEY" ;
-                    }
-                }
-            })->resetAll();
-            ;            
-             * 
-             */
-        }else{
-            $this->_FROM="";
-        }
-        return $this;
-    }
     
     /**
      * where sql clause
      * @param string $list
-     *  __AUTO__ : in automatic mode the where clause is created using the parent model 
+     *  __AUTO__ : in automatic mode the where clause is created using the parent model
      *      if model is an instance the automatic mode uses the primary key
      *      if model is a selection of instances the automatic mode uses property values
      *  string : user defined where clause
@@ -351,19 +308,18 @@ class sql{
         
         if($list=="__AUTO__"){
             $this->_WHERE=array();
-            
             if($case =="is_instance"){
-                //$this->_WHERE["instance"] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
+                $this->_WHERE[$this->parent->db_index()] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
             }else{
                 $this->parent->properties()->each(function( property $PROPERTY) use(&$self,&$andor){
                     $value = $PROPERTY->val();
-                    
-                    if($PROPERTY->val()!=""){
+                    if($value=="" or is_null($value) ){
                         
-                        if($PROPERTY->type()=="checkbox" or $PROPERTY->type()=="number" or $PROPERTY->type()=="id"){
-                            $this->_WHERE[$PROPERTY->name()] = " AND " . $PROPERTY->db_tablename().".". $PROPERTY->realname()."=\"$value\"";
+                    }else{
+                        if($PROPERTY->type()=="checkbox" or $PROPERTY->type()=="number" or $PROPERTY->type()=="pk" or $PROPERTY->type()=="fk"){
+                            $this->_WHERE[$PROPERTY->name()] = " $andor " . $PROPERTY->db_tablename().".". $PROPERTY->realname()."=\"$value\"";
                         }else{
-                            $this->_WHERE[$PROPERTY->name()] = " AND " . $PROPERTY->db_tablename().".". $PROPERTY->realname()." LIKE \"%$value%\"";
+                            $this->_WHERE[$PROPERTY->name()] = " $andor " . $PROPERTY->db_tablename().".". $PROPERTY->realname()." LIKE \"%$value%\"";
                         }
                     }
                 })->resetAll();
@@ -399,6 +355,23 @@ class sql{
         }
         return $this;
     }
+    
+    /**
+     * from sql clause
+     * @param string $list
+     *  __AUTO__ : in automatic mode the field list is created using model properties
+     *  string : table name
+     * @return \xuserver\v5\sql
+     */
+    public function from( $list="__AUTO__") {
+        if($list=="__AUTO__"){
+        }else{
+            $this->_FROM="";
+        }
+        return $this;
+    }
+    
+    
     
     /**
      * limit sql clause
@@ -439,10 +412,10 @@ class sql{
             $self=$this;
             $this->parent->properties()->each(function( property $PROPERTY) use(&$self){
                 $val = $PROPERTY->val();
-                if($PROPERTY->virtual()==1){
+                if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
                     $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
                 }else{
-                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
+                    
                 }
             })->resetAll();
             ;
@@ -471,7 +444,6 @@ class sql{
             //$_JOIN = implode(" ", $this->_JOIN);
             
             if($case =="is_instance"){
-                $this->_WHERE[] = $this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id();
                 $_LIMIT = "";
                 $_OFFSET = "";
                 $_ORDERBY ="" ;
@@ -479,7 +451,6 @@ class sql{
                 if(count($this->_ORDERBY)>0){
                     $_ORDERBY = " ORDER BY  ".implode(" ,", $this->_ORDERBY) ;
                 }else{
-                    //$_ORDERBY ="ORDER BY  ".$this->parent->db_tablename() .".".$this->parent->db_index() . " ASC " ;
                     $_ORDERBY ="" ;
                 }
                 if(strpos($this->_LIMIT, "LIMIT") ===false ){
@@ -507,20 +478,25 @@ class sql{
             }else{
                 $_WHERE ="";
             }
-            
-            
-            
             $this->_sqlstmt="SELECT $_SELECT FROM $this->_FROM $_WHERE $_ORDERBY $_LIMIT $_OFFSET";
+            
         }else if($this->_sqltype=="UPDATE"){
             
             $_SET = implode(", ", $this->_SET);
             if(count($this->_WHERE)>0){
-                $_WHERE = " WHERE ".implode(" AND ", $this->_WHERE);
+                $firstkey = NULL;
+                foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
+                if (null === $firstkey) {
+                    $_WHERE="";
+                }else{
+                    $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
+                    $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
+                }
             }else{
                 $_WHERE ="";
             }
-            
             $this->_sqlstmt="UPDATE $this->_FROM SET $_SET $_WHERE ";
+            
         }
         return $this->_sqlstmt;
     }
@@ -535,21 +511,19 @@ class sql{
      * @return string
      */
     public function statement_read_instance(){
-        $sql = $this->select()->where($this->parent->db_tablename().".".$this->parent->db_index()."=".$this->parent->db_id() )->statement();
-        //debug($sql);
-        return $sql;
+        if ($this->_sqlstmt =="") {
+            $this->_sqlstmt = $this->select()->where()->statement();
+        }
+        return $this->_sqlstmt ;
     }
     /**
      * sql statement to list model as a selection of instances that match certain where clause
      * @return string
      */
     public function statement_read_selection(){
-        
         if ($this->_sqlstmt =="") {
             $this->_sqlstmt = $this->select()->where()->statement();
         }
-        
-        //echo debug($sql);
         return $this->_sqlstmt ;
     }
     
@@ -620,6 +594,12 @@ class model extends iteratorItem{
      * @var model_ui
      */
     public $ui;
+    
+    /**
+     * point to the model itself
+     * @var \xuserver\v5\model
+     */
+    public $parent; 
     
     /**
      * PDO attached to the model 
@@ -698,26 +678,26 @@ class model extends iteratorItem{
      *  
      */
     public function __set($name, $value){
-        //echo "Setting '$name' to '$value'\n";
         $property = $this->_properties->byName($name);
         if($property==false){
-            $this->debug("Magic property <b>$name</b>  doens't exist");
+            //$this->debug("Magic property <b>$name</b>  doens't exist");
+            $this->$name = $value;
         }else{
             $property->val($value);
             $this->_properties->append($property);
         }
     }
     
-    /*
+    
     public function __get($name){
-        echo "Getting  \n"; 
-        if(is_null($name)){
-            return false;
+        $property = $this->_properties->byName($name);
+        if($property==false){
+            return $this->$name;
         }else{
-            return $this->_properties->byName($name)->val();
+            return $property->val();
         }
     }
-    */
+    
     
     /**
      * @todo reflechir a son emploi
@@ -800,10 +780,13 @@ class model extends iteratorItem{
                 $property->name($property_name);
                 $property->realname($property_name);
                 $property->db_tablename($this->db_tablename);
+                
+                $this->properties()->attach($property);
+                
                 if ($property_key == "PRI") {
                     if (strpos($row["Extra"], "auto_increment") !== false) {
                         $this->db_index = $property_name;
-                        $property->is_key(1);
+                        $property->is_primarykey($property_name);
                     }
                 }else{
                 }
@@ -823,7 +806,7 @@ class model extends iteratorItem{
                 if (isset($row["Default"])) {
                     //$property->val($row["Default"]);
                 }
-                $this->properties()->attach($property);
+                
                 
             }
             $this->sql()->build();
@@ -867,17 +850,17 @@ class model extends iteratorItem{
             return $this;
         }else{
             // model built => can load data
-            
         }
         
         // if $id given => build sql_read and instanciate object
         if ( is_int($id) ) {
+            $this->state("is_instance");
             $this->db_id = $id;
             $sql_read=$this->sql()->statement_read_instance();
             //$this->debug("model(is_instance).read($sql_read)");
             try {
                 $instance = $this->db->query($sql_read)->fetchObject();
-                $this->state("is_instance");
+                
                 $this->val($instance);
                 $this->iterator()->init();
                 $this->iterator()->attach($this);
@@ -887,12 +870,13 @@ class model extends iteratorItem{
                 //echo "<div>SQL $sql_read</div>";
             }
         }else if ( $id=="__NULL__" ) {
+            $this->state("is_selection");
             $sql_read=$this->sql()->statement_read_selection();
             //$this->debug("model(is_selection).read($sql_read)");
             try {
                 $qry = $this->db->query($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
-                $this->state("is_selection");
+                
                 $this->iterator()->init();
                 foreach ($selection as $instance) {
                     $this->iterator()->attach($instance);
@@ -1030,10 +1014,7 @@ class model extends iteratorItem{
                 
                 if(isset( $values->$name )){
                     $prop->val( $values->$name );
-                    if($prop->is_key() and  $prop->type()=="id"){
-                        
-                        $prop->parent->db_id($values->$name);
-                    }
+                    
                 }
             });
         }else if(is_array($values)){
@@ -1115,8 +1096,8 @@ class iterator{
         return $this->parent;
     }
     
-    public function count(){
-        return count($this->list);
+    public function count($context="list"){
+        return count($this->$context);
     }
     
     public function attach($item){
@@ -1204,7 +1185,7 @@ class iterator{
                     if($value==""){
                         continue;
                     }else{
-                        if(strpos($value, "." ) ===0 or strpos($value, "#" ) ===0 ){// starting with "." or !
+                        if(strpos($value, "." ) ===0 or strpos($value, "#" ) ===0 ){// starting with "." or #
                             if(".".$p->$by() == $value) {
                                 //echo "<h2> searching exact $value : ". $p->$by() . "</h2>";
                                 $this->append($p);
@@ -1215,9 +1196,11 @@ class iterator{
                             
                         }else{
                             if(strpos($p->$by(), $value) !==false ){
-                                //echo "<h2> searching like $value : ". $p->$by() . "</h2>";
+                                //echo "<h2> found by $by like $value : ". $p->name() . "</h2>";
                                 $this->append($p);
                                 
+                            }else{
+                                //echo "<h2> not found by $by like $value : ". $p->$by() . "</h2>";
                             }
                         }
                     }
@@ -1619,6 +1602,22 @@ class property extends iteratorItem{
         }
     }
     
+    public function is_primarykey($fieldname="__NULL__"){
+        if($fieldname!="__NULL__"){
+            //$this->parent->db_index=$fieldname;
+            $this->is_key=1;
+            $this->type("pk");
+            return $this;
+        }else{
+            if($this->is_key and $this->type()=="pk"){
+                return 1;
+            }else{
+                return 0;
+            }
+        }
+    }
+    
+    
     public function is_foreignkey(){
         $this->is_key=1;
         $this->type("fk");
@@ -1629,11 +1628,16 @@ class property extends iteratorItem{
         return $this->$keyName;
     }
     
+    /**
+     * @deprecated
+     * @param string $set
+     * @return \xuserver\v5\property|number|string
+     */
     public function is_key($set="__RETURN__"){
         if($set!="__RETURN__"){
             $this->is_key=$set;
             if($set){
-                $this->type("id");
+                $this->type("pk");
             }else{
                 $this->type("text");
             }
@@ -1687,7 +1691,19 @@ class property extends iteratorItem{
     
     
     public function val($set="__NULL__"){
+        
+        if($set!="__NULL__"){
+            if($this->is_primarykey()){
+                //debug("<br />set PK ".$name . " : " . $values->$name);
+                $this->parent->db_id($set);
+                $this->parent->state("is_instance");
+            }
+        }else{
+            
+        }
         return parent::val($set);
+        
+        
     }
     
     public function and() {
@@ -1816,13 +1832,19 @@ class model_ui{
     public function form(){
             
         $return ="";
+        $pk=$this->parent->db_index();
+        if($this->parent->properties()->count("selection")<1){
+            $this->parent->properties()->find("text","type");
+        }
         
-        $this->parent->properties()->each(function ($prop) use(&$return){
-            if($prop->is_selected()){
+        $this->parent->properties()->all(function (property $prop) use(&$return){
+            if($prop->is_selected() or $prop->is_primarykey()){
                 $return.=$prop->ui->row();
             }
         });
-        return "<form method='post'>".$return."<div><input type='submit' value='update' name='model_update' /></div></form>";
+        
+        
+        return "<form method='post'>".$return."<div><input type='submit' value='update' name='method_update' /></div></form>";
     }
 }
 
@@ -1853,7 +1875,10 @@ class property_ui{
         if ($this->parent->is("disabled")) {$disabled="disabled='disabled'";}
         if ($this->parent->is("required")) {$required="required='required'";}
         
-        if ($this->parent->type() == "xhtml") {
+        if ($this->parent->is_primarykey()) {
+            $input="<input class='form-control' type=\"hidden\" $required $disabled name='".$this->parent->name()."' id='".$this->formid()."' value=\"".$this->parent->val()."\"  />";
+            
+        }else if ($this->parent->type() == "xhtml") {
             if ($this->parent->val() == "") {$xhtml = "";}else {$xhtml = $this->parent->val();}
             $input = "<textarea class='form-control' $required $disabled rows='3' cols='50' autocomplete='false' name='".$this->parent->name()."' id='".$this->formid()."'>" . ($xhtml) . "</textarea>";
         }else if ($this->parent->type()=="select"){
@@ -1930,7 +1955,12 @@ class property_ui{
     
     public function row(){
         $p = $this->parent;
-        if($p->type()=="checkbox"){
+        if($p->is_primarykey()){
+            return "
+            <div class='form-group'>
+                ".$p->ui->input()." 
+            </div>"; 
+        }else if($p->type()=="checkbox" and !$this->parent->attr("db_typelen")>1 ){
             $classlabel="form-check-label";
             $classdiv="form-check";
             return "
@@ -1948,7 +1978,7 @@ class property_ui{
                 <label class='form-group $classlabel' for='".$this->formid()."'>".$p->name()."</label>
                 ".$p->ui->input()."
                 <small class='form-text text-muted'>".$p->comment()."</small>
-            </div>"; 
+            </div>";
         }
         
         
