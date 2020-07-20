@@ -332,6 +332,39 @@ class sql{
         
     }
     
+    
+    public function update( $list="__AUTO__") {
+        /*
+         UPDATE table_name
+         SET column1 = value1, column2 = value2, ...
+         */
+        $this->_sqltype="UPDATE";
+        if($list=="__AUTO__"){
+            $this->_SET=array();
+            $self=$this;
+            $this->Model->properties()->each(function( property $PROPERTY) use(&$self){
+                $val = $PROPERTY->val();
+                if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
+                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
+                    //$val = $PROPERTY->val(null);
+                }else{
+                    
+                }
+                
+            })->Fill();
+            ;
+            $this->from();
+            $this->_LIMIT="";
+            $this->_OFFSET="";
+        }else if($list==""){
+            
+        }else{
+            $this->_SET=explode(",", $list);
+        }
+        return $this;
+    }
+    
+    
     /**
      * where sql clause
      * @param string $list
@@ -442,36 +475,8 @@ class sql{
         return $this;
     }
 
-    public function update( $list="__AUTO__") {
-        /*
-         UPDATE table_name
-         SET column1 = value1, column2 = value2, ...
-         */
-        $this->_sqltype="UPDATE";
-        if($list=="__AUTO__"){
-            $this->_SET=array();
-            $self=$this;
-            $this->Model->properties()->each(function( property $PROPERTY) use(&$self){
-                $val = $PROPERTY->val();
-                if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
-                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
-                    $val = $PROPERTY->val(null);
-                }else{
-                    
-                }
-                
-            })->Fill();
-            ;
-            $this->from();
-            $this->_LIMIT="";
-            $this->_OFFSET="";
-        }else if($list==""){
-            
-        }else{
-            $this->_SET=explode(",", $list);
-        }
-        return $this;
-    }
+    
+    
     
     
     
