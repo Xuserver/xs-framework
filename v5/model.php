@@ -19,13 +19,37 @@ function debug($s,$echo=false){
 }
 
 
-function cast($module,$class){
-    $obj=null;
-    $chain = "\$obj = new \xuserver\modules\\$module\\$class"."();";
+function BuildClass($module,$tablename){
+    $Class=null;
+    $chain = "\$Class = new \xuserver\modules\\$module\\$tablename"."();";
     eval($chain);
-    return $obj ;
+    
+    if( is_null($Class)){
+        $Class = new model();
+    }else{
+            
+    }
+    return $Class ;
 }
 
+function Build($tablename){
+    $Class=null;
+    $dir = $_SERVER["DOCUMENT_ROOT"]."/xs-framework/modules";
+    $elts = scandir($dir, 1);
+    foreach ($elts as $module){
+        if( $module=="." or $module==".." ){
+        }else if( is_dir($dir."/".$module) and strpos($module,".") ===false ){
+            if(is_file($dir."/$module/$tablename.php")){
+                $Class= BuildClass($module,$tablename);
+                $Class->build($tablename);
+                return $Class;
+            }
+        }
+    }
+    $Class = new model();
+    $Class->build($tablename);
+    return $Class;
+}
 
 
 
@@ -431,9 +455,11 @@ class sql{
                 $val = $PROPERTY->val();
                 if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
                     $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
+                    $val = $PROPERTY->val(null);
                 }else{
                     
                 }
+                
             })->Fill();
             ;
             $this->from();
@@ -925,13 +951,70 @@ class model extends iteratorItem{
      * update model instance or selection
      * @param mixed $values
      */
-    public function update($values=null){
-        $sql_update=$this->sql()->statement_update();
-        
-        if(is_null($values)){
-            echo $sql_update;
+    public function update($values="__NULL__"){
+        if( is_array($values) or is_object($values)){
+            $this->val($values);
         }else{
             
+        }
+        $sql_update=$this->sql()->statement_update();
+        $query = $this->db->query($sql_update);
+        if(!$query){
+            $this->debug("$sql_update");
+        }else{
+        }
+        return $this;
+    }
+    
+    /**
+     * set or retrieve model property values
+     * {@inheritDoc}
+     * @see \xuserver\v5\iteratorItem::val($set)
+     */
+    public function val($values="__NULL__"){
+        if(is_null($values)){
+            $this->properties()->each(function(property $prop){
+                $prop->val(null);
+            });
+        }else if(is_object($values)){
+            $this->properties()->each(function(property $prop)use(&$values){
+                $name=$prop->name();
+                if(isset( $values->$name )){
+                    $prop->val( $values->$name );
+                }
+            });
+        }else if(is_array($values)){
+            
+            
+            if(count($values) > 0){
+                $defaultCheckBox="0";
+            }else{
+                $defaultCheckBox="";
+            }
+            
+            $this->properties()->all(function(property $prop)use(&$values,$defaultCheckBox){
+                $name=$prop->name();
+                
+                if($prop->type()=="checkbox"){
+                    if(isset($values[$name])){
+                        $prop->val( $values[$name]);
+                    }else{
+                        $prop->val($defaultCheckBox);
+                    }
+                }else{
+                    if(isset($values[$name])){
+                        $prop->val( $values[$name]);
+                        //echo "<br />". $prop->val();
+                    }
+                }
+            });
+        }else{
+            $values = new \stdClass();
+            $this->properties()->all(function(property $prop)use(&$values){
+                $name=$prop->name();
+                $values->$name = $prop->val();
+            });
+            return $values;
         }
         
         return $this;
@@ -1025,50 +1108,7 @@ class model extends iteratorItem{
         return $label;
     }
       
-    public function val($values="__NULL__"){
-        if(is_null($values) or $values=="__NULL__"){
-            $this->properties()->each(function(property $prop){
-                $prop->val(null);
-            });
-        }else if(is_object($values)){
-            
-            //debug (count($this->_properties->selection));
-            $this->properties()->each(function(property $prop)use(&$values){
-                $name=$prop->name();
-                //debug("<br />".$name . " : " . $values->$name);
-                
-                if(isset( $values->$name )){
-                    $prop->val( $values->$name );
-                    
-                }
-            });
-        }else if(is_array($values)){
-            
-            if(count($values) > 0){
-                $defaultCheckBox="0";
-            }else{
-                $defaultCheckBox="";
-            }
-            
-            $this->properties()->each(function(property $prop)use(&$values,$defaultCheckBox){
-                $name=$prop->name();
-                if($prop->type()=="checkbox"){
-                    if(isset($values[$name])){
-                        $prop->val( $values[$name]);
-                    }else{
-                        $prop->val($defaultCheckBox);
-                    }
-                }else{
-                    if(isset($values[$name])){
-                        $prop->val( $values[$name]);
-                    }
-                }
-            });
-        }else{
-        }
-        
-        return $this;
-    }
+    
 
 }
 
@@ -1453,7 +1493,7 @@ class properties extends iterator{
     
     public function update(){
         $this->found();
-        $this->Model->sql()->update();
+        $this->Model->sql()->select()->update();
         $this->Empty("properties.update");
         return $this;
     }
@@ -1486,8 +1526,8 @@ class relation extends iteratorItem{
     public function load(){
         
         if($this->Model->state()=="is_instance"){
-            $dual=new model();
-            $dual->build($this->name());
+            $tablename = $this->name();
+            $dual=Build($tablename);
             $dual->properties()->Fetch($this->_type)->val($this->_value);
             return $dual;
         }else{
@@ -1686,8 +1726,9 @@ class property extends iteratorItem{
      */
     public function load(){
         if($this->type()=="fk"){
-            $dual=new model();
-            $dual->build($this->fk_tablename);
+            $tablename = $this->fk_tablename;
+            $dual=Build($tablename);
+
             return $dual;
         }else{
             return $this->Model;

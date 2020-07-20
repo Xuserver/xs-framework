@@ -4,23 +4,21 @@ namespace xuserver\modules\boutique;
 
 class customers extends \xuserver\v5\model{
     
-    public function popo(){
-        return $this->properties()->find("affaire")->val();
-    }
-    public function form_test(){
-        $return ="";
-        $this->properties()->find(".affaire,.code,.id,da,hta,.moa_csps,.moa_controleur_technique ")->each(function ($p) use(&$return){
-            $return .= "<div>".$p->name() . " (".$p->type().") ". $p->ui->input()."</div>";
-        })->select();
-        ;
+    public function orders($status="Shipped"){
         
-        $this->relations()->find("epc")->each(function ($p) use(&$return){
-            $return.= "<div>".$p->ui->input()."</div>";
-        })
-        ;
-            $return="<div>$return</div>";
-            return $return;
+        /**
+         * Specific method for customers class, inherit model
+         * Return $relation with given a status 
+         * @var $relation
+         */
+        $relation = $this->relations()->Fetch("orders")->load();
+        $relation->properties()->find("customerName");
+        $relation->properties()->find("orderNumber, orderDate, requiredDate, shippedDate, status")->select();
+        $relation->properties()->find("#status")->val($status)->where();
+        $relation->read();
+        return $relation;
     }
+    
 }
 
 ?>
