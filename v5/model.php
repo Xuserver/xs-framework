@@ -346,7 +346,7 @@ class sql{
                 $val = $PROPERTY->val();
                 if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
                     $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
-                    //$val = $PROPERTY->val(null);
+                    //echo "349";
                 }else{
                     
                 }
@@ -625,11 +625,26 @@ class sql{
 
 /**
  * ORM Model class
+ *
+ * @author gael jaunin
+ *
+ */
+class modelEvents extends iteratorItem{
+    protected function OnBuild() {
+        
+    }
+    
+}
+
+
+
+/**
+ * ORM Model class
  *    
  * @author gael jaunin
  *
  */
-class model extends iteratorItem{
+class model extends modelEvents{
     private $__debug="";
     /**
      * sql class attached to the model
@@ -736,14 +751,40 @@ class model extends iteratorItem{
         }
     }
     
-    
+     
+    /**
+     * /**
+     * overloading function 
+     * § syntax : create o retrieve the property object.
+     * otherwise ; set or retrieve the  property value.
+     * @param string $name
+     * @return \xuserver\v5\property|string
+     */ 
     public function __get($name){
-        $property = $this->_properties->Fetch($name);
-        if($property==false){
-            return $this->$name;
+        if(strpos($name, "§")==0 ){
+            $name = str_replace ( "§", "", $name);
+            $property = $this->_properties->Fetch($name);
+            
+            if($property==false){
+                // create a propety 
+                $property = new property();
+                $this->properties()->Attach($property->name("$name"));
+                return  $property;
+                
+            }else{
+                return $property;
+            }
+
         }else{
-            return $property->val();
+            $property = $this->_properties->Fetch($name);
+            if($property==false){
+                return $this->$name;
+            }else{
+                return $property->val();
+            }
         }
+        
+        
     }
     
     
@@ -881,6 +922,13 @@ class model extends iteratorItem{
 
             $this->state("is_model");
             //$this->read();
+            /**
+             * Business Events
+             */
+            
+            $this->OnBuild();
+            
+            
             
         }else if($driver == 'pgsql'){
             //$mysql_tablestructure = $this->pdo->query("SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'some_table'");
@@ -928,7 +976,7 @@ class model extends iteratorItem{
         }else if ( $id=="__NULL__" ) {
             $this->state("is_selection");
             $sql_read=$this->sql()->statement_read_selection();
-            //$this->debug("model(is_selection).read($sql_read)");
+            //echo debug($sql_read);
             try {
                 $qry = $this->db->query($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
@@ -1872,7 +1920,7 @@ class model_ui{
         $thead = "<thead>";
         $tbody = "<tbody>";
         $thead .= "<tr>";
-        $cntspan = -1;
+        $cntspan = 0;
          
         $this->parent->properties()->each(function($prop)use(&$thead,&$cntspan){
             if($prop->is_selected()){
@@ -1891,6 +1939,13 @@ class model_ui{
                 if($prop->is_selected()){
                     if($prop->type()=="file"){
                         $tbody.="<td>file</td>";
+                    }else if($prop->type()=="checkbox"){
+                        if($prop->val()=="1"){
+                            $tbody.="<td>Yes</td>";
+                        }else{
+                            $tbody.="<td>No</td>";
+                        }
+                            
                     }else{
                         $tbody.="<td>".$prop->val()."</td>";
                     }
@@ -1902,7 +1957,7 @@ class model_ui{
         ;
         
         $this->parent->properties()->Empty();
-        $tfoot = "<tr><td colspan='".($cntspan--)."'>$cnt rows found <td></tr>";
+        $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows found</th></tr>";
         return "<table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
     }
     
@@ -2039,7 +2094,7 @@ class property_ui{
             <div class='form-group'>
                 ".$p->ui->input()." 
             </div>"; 
-        }else if($p->type()=="checkbox" and !$this->parent->attr("db_typelen")>1 ){
+        }else if($p->type()=="checkbox" and $this->parent->attr("db_typelen")<=1 ){
             $classlabel="form-check-label";
             $classdiv="form-check";
             return "
@@ -2049,6 +2104,7 @@ class property_ui{
                 </label>
                 <small class='form-text text-muted'>".$p->comment()."</small>
             </div>"; 
+            
         }else{
             $classlabel="";
             $classdiv="";
