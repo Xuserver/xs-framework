@@ -1,0 +1,40 @@
+<?php
+/**
+ * GJ 25/06/2020
+ */
+
+/**********************************************************************************************************
+ * _config
+ **********************************************************************************************************/
+
+if( $_SERVER['HTTP_HOST'] =="localhost"){
+    
+    define('XUSERVER_DB_SERVER',"localhost");   // Database server internet address
+    define('XUSERVER_DB_NAME',"bjas_prod");     // Database name
+    define('XUSERVER_DB_USERNAME',"root");   // Database username
+    define('XUSERVER_DB_PASSWORD',"gaelloic");  // Database password
+}else{
+    define('XUSERVER_DB_SERVER',"bjas.myd.infomaniak.com");   // Database server internet address
+    define('XUSERVER_DB_NAME',"bjas_prod");     // Database name
+    define('XUSERVER_DB_USERNAME',"bjas_gael");   // Database username
+    define('XUSERVER_DB_PASSWORD',"gaelloic");  // Database password
+}
+
+spl_autoload_register(function($class){
+    $class=str_replace('xuserver\\', '', $class);
+    require $_SERVER["DOCUMENT_ROOT"]."/xs-framework/".str_replace('\\', '/', $class).".php";
+});
+    
+    require $_SERVER["DOCUMENT_ROOT"]."/xs-framework/v5/model.php";
+    
+    // system DBO object
+    try{
+        $XUSERVER_DB_PDO = new PDO("mysql:host=".XUSERVER_DB_SERVER.";dbname=".XUSERVER_DB_NAME.";charset=utf8", XUSERVER_DB_USERNAME, XUSERVER_DB_PASSWORD);
+        //$dbprod->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $XUSERVER_DB =new xuserver\v5\database($XUSERVER_DB_PDO);
+        
+    }catch(PDOException  $e ){
+        die($e);
+    }
+    
+?>

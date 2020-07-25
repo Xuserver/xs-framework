@@ -1961,10 +1961,16 @@ class model_ui{
         return "<table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
     }
     
+    private function uiid(){
+        return $this->parent->db_tablename()."-".$this->parent->db_id();
+        
+    }
+    
+    
     public function form(){
             
         $return ="";
-        $pk=$this->parent->db_index();
+        //$pk=$this->parent->db_index();
         if($this->parent->properties()->Count("selection")<1){
             $this->parent->properties()->find("text","type");
         }
@@ -1974,9 +1980,22 @@ class model_ui{
                 $return.=$prop->ui->row();
             }
         });
-        
-        
-        return "<form method='post'>".$return."<div><input type='submit' value='update' name='method_update' /></div></form>";
+        ;
+        $uiid = $this->uiid();
+        return "<form id=\"$uiid\" method='post'>
+            <h3>$uiid</h3>".
+            "<div>
+                <input type='hidden' name='model_build' value='$uiid' />
+                <input type='hidden' name='method' value='' />
+            </div>".
+            $return.
+            "<div>
+                <input type='submit' name='form_submit' value = 'create' />
+                <input type='submit' name='form_submit' value = 'read' />
+                <input type='submit' name='form_submit' value='update' />
+                <input type='submit' name='form_submit' value = 'delete' />
+             </div>
+            </form>";
     }
 }
 

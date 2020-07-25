@@ -43,20 +43,33 @@ function ajaxResponse(html){
     	var element = $(this);
     	$ajaxResponseDispatchNode(element)
 	});
+	
 }
 
-function $ajaxForm(form){
-	form.submit(function(e){
-		 var $form = $(this);
+
+
+function $ajaxForm($form){
+	
+	$form.find("input[type=submit]").click(function(){
+		$button = $(this)
+		$form.find("input[name=method").val($button.attr('value'))
+		//$form.submit();
+	})
+	
+	
+	$form.submit(function(e){
+		 //var $form = $(this);
 		 var fd = new FormData(this);
 		 $form.find('input[type="checkbox"]').each(function(e){
 			 if(! $(this).prop('checked')){
 				 fd.append($(this).attr('name'),"0")
 			 }
 		 });
+		 
 		 $.ajax({
+			 type: "post",
 			 data: fd,
-			 url: "index.php",
+			 url: "/xs-framework/v5/router.php",
 			 processData: false,
 			 contentType: false,
 			 cache: false,
@@ -72,24 +85,18 @@ function $ajaxForm(form){
 
 function $ajaxResponseDispatchNode(element){
 	var $body=$("body");
-	
 	var selector = element.prop("tagName")+"[id='"+element.attr("id")+"']";
-	
 	if(element.attr("id")==""){
-		alert("1")
         return false;
 	}else{
     	var existing = $body.find(selector);
     	if(existing==undefined){
-    		alert("2")
     		return false;
     	}
     	if(existing.length != 0 ){
-
-        	existing.replaceWith(element.show());
+    		existing.replaceWith(element);
             return true;
     	}else{
-    		alert("3")
     		return false;
     		
     	}
