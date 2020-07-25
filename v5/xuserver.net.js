@@ -27,11 +27,22 @@
 
 
 $( document ).ready(function() {
-	ajaxResponse(this);
+	ajaxResponse($("body"));
 });
+
+
+
+
+
 
 function ajaxResponse(html){
 	$html = $(html);
+	
+	if($html.prop("tagName")=="BODY"){
+		
+	}else{
+		$html=$("<div></div>").append($html)
+	}
 	
 	$html.find("form").each(function() {
 		$form = $(this)
@@ -40,10 +51,10 @@ function ajaxResponse(html){
 	});
 	
 	$html.find("div[id]").each(function() {
-    	var element = $(this);
-    	$ajaxResponseDispatchNode(element)
+    	var $element = $(this);
+    	$ajaxResponseDispatchNode($element)
 	});
-	
+
 }
 
 
@@ -53,6 +64,7 @@ function $ajaxForm($form){
 	$form.find("input[type=submit]").click(function(){
 		$button = $(this)
 		$form.find("input[name=method").val($button.attr('value'))
+		$form.xsMethod = $button.attr('value');
 		//$form.submit();
 	})
 	
@@ -60,6 +72,7 @@ function $ajaxForm($form){
 	$form.submit(function(e){
 		 //var $form = $(this);
 		 var fd = new FormData(this);
+		 
 		 $form.find('input[type="checkbox"]').each(function(e){
 			 if(! $(this).prop('checked')){
 				 fd.append($(this).attr('name'),"0")
@@ -74,6 +87,7 @@ function $ajaxForm($form){
 			 contentType: false,
 			 cache: false,
 			 success: function(data) {
+				 console.log("success form post " + $form.xsMethod)
 				 ajaxResponse(data);
 			 },
 			 complete: function() {
@@ -94,9 +108,12 @@ function $ajaxResponseDispatchNode(element){
     		return false;
     	}
     	if(existing.length != 0 ){
+    		console.log("replacement "+ element.attr("id"))
     		existing.replaceWith(element);
             return true;
     	}else{
+    		console.log("replacement "+ element.attr("id"))
+    		$body.append(element)
     		return false;
     		
     	}

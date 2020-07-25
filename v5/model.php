@@ -9,7 +9,7 @@ namespace xuserver\v5;
 use PDO;
 
 function debug($s,$echo=false){
-    $alert = "<div class='alert alert-warning'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button> $s </div>";
+    $alert = "<div id='xs-debug' class='alert alert-warning'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button> $s </div>";
     if($echo){
         echo $alert;
     }else{
@@ -1858,9 +1858,11 @@ class model_ui{
     public function __construct(model &$parent){
         $this->parent=$parent;
     }
+    
     public function structure(){
-        $return="";
         
+        $uiid = $this->uiid();
+        $return="";
         $sql = $this->parent->sql()->statement_current();
         
         $table="<tr><th colspan='6'><h2>model <u>".$this->parent->db_tablename()."</u></h2></th></tr>";
@@ -1909,7 +1911,10 @@ class model_ui{
             $lines .= "<tr><td>".$item->name()."</td><td>".$item->val()."</td><td>".$item->type()."</td><td>".$item->db_tablename()."</td><td></td><td></td></tr>";
         });
         $table.=$lines;
-        $return .= "<h1>structure </h1><table class='table'>$table</table>";
+        
+        $date = date("D/M/Y H:s");
+        
+        $return .= "<div id=\"$uiid-structure\"><h1>structure </h1><table class='table'>$table</table><div class='small'>$date</div></div>";
         return $return;
     }
     
@@ -1917,6 +1922,7 @@ class model_ui{
     
     
     public function table(){
+        $uiid = $this->uiid();
         $thead = "<thead>";
         $tbody = "<tbody>";
         $thead .= "<tr>";
@@ -1958,17 +1964,17 @@ class model_ui{
         
         $this->parent->properties()->Empty();
         $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows found</th></tr>";
-        return "<table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>";
+        return "<div id=\"$uiid-table\"><table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table></div>";
     }
     
     private function uiid(){
         return $this->parent->db_tablename()."-".$this->parent->db_id();
-        
     }
     
     
     public function form(){
-            
+        
+        $uiid = $this->uiid();
         $return ="";
         //$pk=$this->parent->db_index();
         if($this->parent->properties()->Count("selection")<1){
@@ -1981,12 +1987,13 @@ class model_ui{
             }
         });
         ;
-        $uiid = $this->uiid();
-        return "<form id=\"$uiid\" method='post'>
+        
+        $date = date("D/M/Y H:s");
+        return "<form id=\"$uiid-form\" method='post'>
             <h3>$uiid</h3>".
             "<div>
-                <input type='hidden' name='model_build' value='$uiid' />
-                <input type='hidden' name='method' value='' />
+                <input type='hiddens' name='model_build' value='$uiid' />
+                <input type='hiddens' name='method' value='' />
             </div>".
             $return.
             "<div>
@@ -1995,6 +2002,7 @@ class model_ui{
                 <input type='submit' name='form_submit' value='update' />
                 <input type='submit' name='form_submit' value = 'delete' />
              </div>
+             <div class='small'>$date</div>
             </form>";
     }
 }
