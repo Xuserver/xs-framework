@@ -36,4 +36,4 @@ les modules existants
 - gestion de projet construction (en cours)
 
 visit
-http://xuserver.net/xs-framework/ 
+http://xuserver.net/xs-demo/ 
