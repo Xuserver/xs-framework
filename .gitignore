@@ -11,7 +11,7 @@ local.properties
 .recommenders
 RemoteSystemsTempFiles/
 xuserver.versions/
-
+*config.php
 
 
 # External tool builders
