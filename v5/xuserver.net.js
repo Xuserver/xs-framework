@@ -25,11 +25,64 @@
 
 
 
-
+var $myScreen = "";
+var xsNotifications;
+function xsLayout(){
+    xsNotifications = $("<div style='z-index:999; position: fixed; right:0; padding-top:5px; width:300px; min-height:1px;' />")
+    $("body").prepend(xsNotifications);
+    
+}
 $( document ).ready(function() {
-	ajaxResponse($("body"));
+	xsLayout();
+    duplicateIDs($("body"))
+    ajaxResponse($("body"));
+	$myScreen = $("#myScreen")
 });
 
+
+function duplicateIDs($html){
+    console.groupCollapsed("duplicate ID")    
+    $html.find('[id]').each(function(){
+        var ids = $('[id="'+this.id+'"]');
+        
+        if(ids.length>1 && ids[0]==this){
+            var idFound = this.id
+            console.groupCollapsed("ID #"+idFound)
+            var placeholder=null;
+            ids.each(function(){
+                var current = $(this)
+                if(current.hasClass("xs-placeholder")){
+                    console.log("found placeholder")
+                    placeholder=current
+                }
+            });
+            if(placeholder==null){
+                placeholder=$(ids[0]).addClass("xs-placeholder")
+                console.log("create placeholder")
+            }
+            ids.each(function(){
+                var current = $(this)
+                if(current.hasClass("xs-placeholder")){
+                }else{
+                    current.attr("id","");
+                    if(current.html().trim()==""){
+                        console.log(" remove empty element ")
+                        current.remove()
+                    }else if(current.html().trim()==placeholder.html().trim()){
+                        console.log(" remove indentical element ")
+                        current.remove()
+                    }else{
+                        console.log(" append element children")
+                        placeholder.append(current.children());                        
+                    }
+                }
+            });
+            console.groupEnd()
+        }
+        
+    });
+    console.groupEnd()
+} 
 
 
 
@@ -37,13 +90,39 @@ $( document ).ready(function() {
 
 function ajaxResponse(html){
 	$html = $(html);
-	
+	var time = new Date().toLocaleString();
+    console.groupCollapsed("ajaxResponse "+time)
+    
 	if($html.prop("tagName")=="BODY"){
-		
 	}else{
 		$html=$("<div></div>").append($html)
 	}
 	
+    console.groupCollapsed("xs class")
+    console.log(".xs-link")
+    $html.find("a.xs-link").click(function(e) {
+		var fd = new FormData();
+		fd.append("method","form");
+		fd.append("model_build",$(this).attr("href"));
+		fdPost(fd)
+		e.preventDefault();
+	});
+    
+    console.log(".xs-notify")
+    $html.find(".xs-notify").each(function() {
+        var $notification = $(this);
+        xsNotifications.prepend($notification);
+        setTimeout(function(){ $notification.fadeOut().remove() }, 5000);
+    });
+    console.log(".xs-debug")
+    $html.find(".xs-debug").each(function() {
+        var $notification = $(this);
+        $myScreen.prepend($notification.addClass("sticky-top"));
+        setTimeout(function(){ $notification.fadeOut().remove() }, 5000);
+    });
+    console.groupEnd()
+
+    console.groupCollapsed("dispatch ID")    
 	$html.find("form").each(function() {
 		$form = $(this)
 		$ajaxForm($form);
@@ -52,8 +131,22 @@ function ajaxResponse(html){
 	
 	$html.find("div[id]").each(function() {
     	var $element = $(this);
-    	$ajaxResponseDispatchNode($element)
+        $ajaxResponseDispatchNode($element)
 	});
+    console.groupEnd()
+    
+    
+    if($html.prop("tagName")=="BODY"){
+        
+	}else{
+        $myScreen.append($html);
+        //console.log($html.html().length)
+	}
+    console.groupEnd()
+    
+    
+    
+    
 
 }
 
@@ -71,29 +164,34 @@ function $ajaxForm($form){
 	
 	$form.submit(function(e){
 		 //var $form = $(this);
-		 var fd = new FormData(this);
 		 
-		 $form.find('input[type="checkbox"]').each(function(e){
+		 var fd = new FormData(this);
+         $form.find('input[type="checkbox"]').each(function(e){
 			 if(! $(this).prop('checked')){
 				 fd.append($(this).attr('name'),"0")
 			 }
 		 });
+		 fdPost(fd)
 		 
-		 $.ajax({
-			 type: "post",
-			 data: fd,
-			 url: "/xs-framework/v5/router.php",
-			 processData: false,
-			 contentType: false,
-			 cache: false,
-			 success: function(data) {
-				 console.log("success form post " + $form.xsMethod)
-				 ajaxResponse(data);
-			 },
-			 complete: function() {
-			 }
-		 });
 		e.preventDefault();
+	 });
+}
+
+
+function fdPost(fd){
+	$.ajax({
+		 type: "post",
+		 data: fd,
+		 url: "/xs-framework/v5/router.php",
+		 processData: false,
+		 contentType: false,
+		 cache: false,
+		 success: function(data) {
+			 
+			 ajaxResponse(data);
+		 },
+		 complete: function() {
+		 }
 	 });
 }
 
@@ -108,14 +206,13 @@ function $ajaxResponseDispatchNode(element){
     		return false;
     	}
     	if(existing.length != 0 ){
-    		console.log("replacement "+ element.attr("id"))
+    		console.log("#"+ element.attr("id"))
     		existing.replaceWith(element);
             return true;
     	}else{
-    		console.log("replacement "+ element.attr("id"))
-    		$body.append(element)
+    		console.warn("#"+ element.attr("id"))
+    		$myScreen.append(element)
     		return false;
-    		
     	}
 	}
 }

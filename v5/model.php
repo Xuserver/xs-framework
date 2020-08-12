@@ -1,7 +1,5 @@
 <?php 
-/**
- * GJ 25/06/2020
- */
+
 
 
 namespace xuserver\v5;
@@ -15,7 +13,11 @@ function debug($s,$echo=false){
     }else{
         return $alert;
     }
-    
+}
+function notify($s,$class="warning"){
+    $id="xs-info-".rand();
+    $alert = "<div id='$id' class='xs-notify  alert alert-$class'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button> $s </div>";
+    return $alert;
 }
 
 
@@ -112,7 +114,7 @@ class database{
             if (is_numeric($found)) {
                 $property->attr("db_typelen",$found);
             }else {
-            }
+            }  
         }else{
             $db_type = strtoupper($db_type);
         }
@@ -121,10 +123,14 @@ class database{
             $property->type("pk");
             
         }else if (in_array($db_type, $this->aBOOL)) {
-            $property->type ("checkbox");
+            if($property->attr("db_typelen")>1){
+                $property->type("radio");
+            }else{
+                $property->type("checkbox");
+            }
             
         }else if (in_array($db_type, $this->aXHTML)) {
-            $property->type("xhtml");
+            $property->type("textarea");
             
         }else if (in_array($db_type, $this->aNUMBER)) {
             $property->type("number");
@@ -160,13 +166,25 @@ class database{
      * @return \PDO 
      */
     public function query(string $stmt){
-        
-        try {
-            $ret= $this->pdo->query($stmt);
-        } catch (\PDOException $e) {
-            $ret = $e;
-        }
+        $ret= $this->pdo->query($stmt);
         return $ret;
+    }
+    
+    /**
+     * @deprecated
+     */
+    public function execute(string $stmt,$data=""){
+        $stmt = $this->pdo->prepare($stmt);
+        try {
+            $this->pdo->beginTransaction();
+            foreach ($data as $row){
+                $stmt->execute($row);
+            }
+            $this->pdo->commit();
+        }catch (\Exception $e){
+            $this->pdo->rollback();
+            throw $e;
+        }
     }
     
     /**
@@ -202,6 +220,9 @@ class sql{
     
     private $_SET;
     
+    private $_INTO;
+    private $_VALUES;
+    
     public function __construct(model&$model) {
         $this->Model=$model;
         $this->reset();
@@ -231,6 +252,9 @@ class sql{
         $this->_LIMIT="";
         $this->_OFFSET="";
         $this->_SET=array();
+
+        $this->_INTO=array();
+        $this->_VALUES=array();
         return $this;
     }
     
@@ -312,11 +336,9 @@ class sql{
         $this->reset();
         if($list=="__AUTO__"){
             $SQL=$this;
-            
             $SQL->Model->properties()->each(function( property $PROPERTY) use(&$SQL){
                 $SQL->_SELECT[$PROPERTY->name()]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." AS " . $PROPERTY->name();
-            })->Fill();
-            ;
+            })->Empty();//->Fill();
             $this->Model->properties()->sort($SQL->_SELECT);
             
         }else if(is_null($list)){
@@ -345,13 +367,13 @@ class sql{
             $this->Model->properties()->each(function( property $PROPERTY) use(&$self){
                 $val = $PROPERTY->val();
                 if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
-                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = '$val'" ;
+                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = \"$val\"" ;
                     //echo "349";
                 }else{
                     
                 }
                 
-            })->Fill();
+            })->Empty();
             ;
             $this->from();
             $this->_LIMIT="";
@@ -360,6 +382,39 @@ class sql{
             
         }else{
             $this->_SET=explode(",", $list);
+        }
+        return $this;
+    }
+    
+    public function insert( $list="__AUTO__") {
+        /*
+         INSERT INTO table_name (column1 , column2 ...)
+         VALUES ('val1', 'val2' ...)
+         */
+        $this->_sqltype="INSERT_INTO";
+        if($list=="__AUTO__"){
+            $this->_INTO=array();
+            $this->_VALUES=array();
+            $self=$this;
+            $this->Model->properties()->each(function( property $PROPERTY) use(&$self){
+                $val = $PROPERTY->val();
+                if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
+                    $self->_INTO[$PROPERTY->name()]= $PROPERTY->realname() ;
+                    $self->_VALUES[$PROPERTY->name()]="\"$val\"" ;
+                    //echo "349";
+                }else{
+                    
+                }
+                
+            })->Empty();
+            ;
+            $this->from();
+            $this->_LIMIT="";
+            $this->_OFFSET="";
+        }else if($list==""){
+            
+        }else{
+            $this->_VALUES=explode(",", $list);
         }
         return $this;
     }
@@ -378,17 +433,28 @@ class sql{
     
     public function where($list="__AUTO__",$andor="AND") {
         $self=$this;
-        $case = $self->Model->state() ;
+        $case = $self->Model->state();
         
         if($list=="__AUTO__"){
             $this->_WHERE=array();
             if($case =="is_instance"){
-                $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()."=".$this->Model->db_id();
+                $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()."=\"".$this->Model->db_id()."\"";
+                
+                //echo "<div id='sss'>why ?</div>";
+                
             }else{
                 $this->Model->properties()->each(function( property $PROPERTY) use(&$self,&$andor){
                     $value = $PROPERTY->val();
                     if($value=="" or is_null($value) ){
-                        
+                         
+                    }else{
+                        $this->_WHERE[$PROPERTY->name()] = $PROPERTY->condition();
+                    }
+                    
+                    /*
+                    $value = $PROPERTY->val();
+                    if($value=="" or is_null($value) ){
+                         
                     }else{
                         if($PROPERTY->type()=="checkbox" or $PROPERTY->type()=="number" or $PROPERTY->type()=="pk" or $PROPERTY->type()=="fk"){
                             $this->_WHERE[$PROPERTY->name()] = " $andor " . $PROPERTY->db_tablename().".". $PROPERTY->realname()."=\"$value\"";
@@ -396,6 +462,7 @@ class sql{
                             $this->_WHERE[$PROPERTY->name()] = " $andor " . $PROPERTY->db_tablename().".". $PROPERTY->realname()." LIKE \"%$value%\"";
                         }
                     }
+                    */
                 })->Fill();
             }
         }else if(is_null($list)){
@@ -545,6 +612,13 @@ class sql{
             }
             $this->_sqlstmt="UPDATE $this->_FROM SET $_SET $_WHERE ";
             
+        }else if($this->_sqltype=="INSERT_INTO"){
+            
+            $_INTO = implode(", ", $this->_INTO);
+            $_VALUES = implode(", ", $this->_VALUES);
+            $TABLE = $this->Model->db_tablename();
+            $this->_sqlstmt="INSERT INTO $TABLE($_INTO) VALUES ($_VALUES) ";
+            
         }
         return $this->_sqlstmt;
     }
@@ -559,9 +633,9 @@ class sql{
      * @return string
      */
     public function statement_read_instance(){
-        if ($this->_sqlstmt =="") {
-            $this->_sqlstmt = $this->select()->where()->statement();
-        }
+        $this->Model->properties()->Fill();
+        $this->_sqlstmt = $this->select()->where()->statement();
+        //echo debug($this->_sqlstmt);
         return $this->_sqlstmt ;
     }
     /**
@@ -580,7 +654,16 @@ class sql{
      * @return string
      */
     public function statement_update(){
-        $sql = $this->update()->where( )->statement();
+        $sql = $this->update()->where()->statement();
+        return $sql;
+    }
+    
+    /**
+     * sql statement to update an instance of Model model
+     * @return string
+     */
+    public function statement_insert(){
+        $sql = $this->insert()->statement();
         return $sql;
     }
     
@@ -629,22 +712,51 @@ class sql{
  * @author gael jaunin
  *
  */
-class modelEvents extends iteratorItem{
+class modelPrivate extends iteratorItem{
+    
+}
+
+/**
+ * ORM Model class
+ *
+ * @author gael jaunin
+ *
+ */
+class modelProtected extends modelPrivate{
     protected function OnBuild() {
+        
+    }
+    
+    protected function OnSelection() {
+        
+    }
+    
+    protected function OnInstance() {
+        
+    }
+    
+    protected function OnUpdate() {
+        
+    }
+    
+    protected function OnCreate() {
+        
+    }
+    
+    protected function OnDelete() {
         
     }
     
 }
 
 
-
 /**
  * ORM Model class
- *    
+ *
  * @author gael jaunin
  *
  */
-class model extends modelEvents{
+class modelPublic extends modelProtected{
     private $__debug="";
     /**
      * sql class attached to the model
@@ -704,6 +816,11 @@ class model extends modelEvents{
      */
     private $_relations;
     /**
+     * iterator that stores model methods
+     * @var methods
+     */
+    private $_methods;
+    /**
      * iterator that stores model instances
      * @var mixed (model or stdClass) 
      */
@@ -761,7 +878,9 @@ class model extends modelEvents{
      * @return \xuserver\v5\property|string
      */ 
     public function __get($name){
-        if(strpos($name, "§")==0 ){
+        
+        if(strpos($name, "§")===0 ){
+            
             $name = str_replace ( "§", "", $name);
             $property = $this->_properties->Fetch($name);
             
@@ -820,17 +939,132 @@ class model extends modelEvents{
         $this->sql =  new sql($this);
         $this->_properties =  new properties($this);
         $this->_relations = new relations($this);
+        $this->_methods = new methods($this);
         $this->_iterator = new iterator($this);
         $this->state("is_virgin");
         return $this;
     }
     
+    
+    
+    
+    
+    
+    
+    
+    
+    /**
+     * set model current _state
+     * @param string $set
+     * @return \xuserver\v5\model|string
+     */
+    public function state($set="__NULL__"){
+        if($set!="__NULL__"){
+            $this->_state=$set;
+            return $this;
+        }else{
+            return $this->_state;
+        }
+    }
+    
+    /**
+     * 
+     * @return \xuserver\v5\sql
+     */
+    public function sql(){
+        return $this->sql;
+    }
+    
+    /**
+     * 
+     * @return \xuserver\v5\iterator
+     */
+    public function iterator(){
+        return $this->_iterator;
+    }
+    
+    /**
+     * 
+     * @return \xuserver\v5\properties
+     */
+    public function properties(){
+        //$this->_properties->Empty();
+        return $this->_properties;
+    }
+    /**
+     *
+     * @return \xuserver\v5\relations
+     */
+    public function relations(){
+        return $this->_relations;
+    }
+    /**
+     *
+     * @return \xuserver\v5\methods
+     */
+    public function methods(){
+        return $this->_methods;
+    }
+    /**
+     * 
+     * @return \xuserver\v5\database
+     */
+    public function db(){
+        return $this->db;
+    }
+    /**
+     * 
+     * @return string|mixed
+     */
+    public function db_tablename(){
+        return $this->db_tablename;
+    }
+    
+    public function db_index(){
+        return $this->db_index;
+    }
+    /**
+     * return db id value
+     */
+    public function db_id($set=""){
+        
+        if($set!=""){
+            $this->db_id=$set;
+            return $this;
+        }else{
+            return $this->db_id;
+        }
+        
+    }
+    
+    
+    
+    public function label(){
+        $label="";
+        $this->properties()->find("text","type")->each(function(property $prop)use(&$label){
+            $label .= " ". $prop->val();
+        });
+        return $label;
+    }
+
+}
+
+
+/**
+ * ORM Model class
+ *    
+ * @author gael jaunin
+ *
+ */
+class model extends modelPublic{
+
     /**
      * build model properties, relations and methods
      * @todo implement methods
      * @todo implement default values
      * @todo use iteratorItem props (_name ...) ?
      * @param string $db_tablename
+     * @return \xuserver\v5\model
      */
     public function build($db_tablename="__AUTO__"){
         // destroy current model definition;
@@ -844,10 +1078,10 @@ class model extends modelEvents{
             $this->db_tablename=$db_tablename;
         }
         /*
-        $this->_type="table";
-        $this->_name=$this->db_tablename;
-        $this->_value="0" // name of the first text field ?;
-        */
+         $this->_type="table";
+         $this->_name=$this->db_tablename;
+         $this->_value="0" // name of the first text field ?;
+         */
         
         // build mysql model ;
         $driver=$this->db->driver();
@@ -858,7 +1092,6 @@ class model extends modelEvents{
             $sqlDescribe ="SHOW FULL COLUMNS FROM $this->db_tablename ";
             $queryProperties = $this->db->query($sqlDescribe);
             
-
             foreach ($queryProperties as $row) {
                 $property_key = $row["Key"];
                 $property_name = $row["Field"];
@@ -919,7 +1152,37 @@ class model extends modelEvents{
                 }
                 //echo "<br/><span style='color:$col'>".$this->db_tablename() . " </span> ".$row["db_tablename"]. "  <span style='color:$col'>".$row["table"]. " </span>.<span style='color:$col'>".$row["db_index"]. " </span> ";
             }
-
+            
+            /**
+             * METHODS
+             */
+            $class = new \ReflectionClass($this);
+            $methods = $class->getMethods(); // get class properties
+            foreach ($methods as $METH) {
+                // skip inherited and non public properties
+                if ($class->name == "xuserver\\v5\\model" or $METH->isPublic() == 0 or $METH->getDeclaringClass()->getName() !== $class->getName()) {
+                    continue;
+                }
+                $method = new method();
+                $method->name($METH->name);
+                $this->methods()->Attach($method);
+            }
+            $method = new method();
+            $method->name("update")->is_selected(1);
+            $this->methods()->Attach($method);
+            $method = new method();
+            $method->name("read")->is_selected(1);
+            $this->methods()->Attach($method);
+            $method = new method();
+            $method->name("create")->is_selected(1);
+            $this->methods()->Attach($method);
+            $method = new method();
+            $method->name("delete")->is_selected(1);
+            $this->methods()->Attach($method);
+            
+            
+            //$this->methods()->Empty();
+            
             $this->state("is_model");
             //$this->read();
             /**
@@ -937,87 +1200,6 @@ class model extends modelEvents{
         return $this;
     }
     
-    
-    
-    /**
-     * read model instance from database
-     * @param number $id
-     * @return \xuserver\v5\model
-     */
-    public function read($id="__NULL__"){
-        if ($this->state() == "is_virgin") {
-            // model not built => cant load data
-            return $this;
-        }else{
-            // model built => can load data
-        }
-        
-        // if $id given => build sql_read and instanciate object
-        if ( is_int($id) ) {
-            $this->state("is_instance");
-            $this->db_id = $id;
-            $sql_read=$this->sql()->statement_read_instance();
-            
-            $query = $this->db->query($sql_read);
-            if(!$query){
-                $this->state("is_model");
-                echo "<div><h1>ERROR model::read()<h1></div><div>$sql_read</div>";
-            }else{
-                $instance = $query->fetchObject();
-                $this->val($instance);
-                $this->iterator()->Init();
-                $this->iterator()->Attach($this);
-                $MODEL=$this;
-                $MODEL->relations()->each(function(relation $relation)use(&$MODEL){
-                    $relation->val($MODEL->db_id);
-                });
-            }
-            
-        }else if ( $id=="__NULL__" ) {
-            $this->state("is_selection");
-            $sql_read=$this->sql()->statement_read_selection();
-            //echo debug($sql_read);
-            try {
-                $qry = $this->db->query($sql_read);
-                $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
-                
-                $this->iterator()->Init();
-                foreach ($selection as $instance) {
-                    $this->iterator()->Attach($instance);
-                }
-                
-            }catch(\PDOException $exception) {
-                $this->state("is_model");
-                echo "<div><h1>ERROR model::read()<h1></div><div>$exception</div>";
-                //echo "<div>SQL $sql_read</div>";
-            }
-        }else{
-            
-        }
-        
-        
-        $this->properties()->Empty("model.read($this->db_tablename)");
-        return $this;
-    }
-    
-    /**
-     * update model instance or selection
-     * @param mixed $values
-     */
-    public function update($values="__NULL__"){
-        if( is_array($values) or is_object($values)){
-            $this->val($values);
-        }else{
-            
-        }
-        $sql_update=$this->sql()->statement_update();
-        $query = $this->db->query($sql_update);
-        if(!$query){
-            $this->debug("$sql_update");
-        }else{
-        }
-        return $this;
-    }
     
     /**
      * set or retrieve model property values
@@ -1037,13 +1219,23 @@ class model extends modelEvents{
                 }
             });
         }else if(is_array($values)){
+            $defaultCheckBox="";
             
             
+            if($this->state()=="is_instance"){
+                $defaultCheckBox="0";
+            }else{
+                $defaultCheckBox="";
+            }
+            /*
             if(count($values) > 0){
                 $defaultCheckBox="0";
             }else{
                 $defaultCheckBox="";
             }
+            */
+            
+            
             
             $this->properties()->all(function(property $prop)use(&$values,$defaultCheckBox){
                 $name=$prop->name();
@@ -1069,101 +1261,120 @@ class model extends modelEvents{
             });
             return $values;
         }
+        $this->properties()->Empty();
+        return $this;
+    }
+    /**
+     * read model instance from database
+     * @param number $id
+     * @return \xuserver\v5\model
+     */
+    public function read($id="__NULL__"){
+        if ($this->state() == "is_virgin") {
+            // model not built => cant load data
+            return $this;
+        }else{
+            // model built => can load data
+        }
         
+        // if $id given => build sql_read and instanciate object
+        if ($id=="__NULL__" or $id=="0") {
+            $this->state("is_selection");
+            $sql_read=$this->sql()->statement_read_selection();
+            try {
+                $qry = $this->db->query($sql_read);
+                $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
+                $this->iterator()->Init();
+                $this->OnSelection();
+                foreach ($selection as $instance) {
+                    $this->iterator()->Attach($instance);
+                }
+                
+            }catch(\PDOException $exception) {
+                $this->state("is_model");
+                echo "<div><h1>ERROR model::read()<h1></div><div>$exception</div>";
+                //echo "<div>SQL $sql_read</div>";
+            }            
+            
+        }else{
+            $this->state("is_instance");
+            $this->db_id($id);
+            $sql_read=$this->sql()->statement_read_instance();
+            //notify($sql_read);
+            $query = $this->db->query($sql_read);
+            if(!$query){
+                $this->state("is_model");
+                echo "<div><h1>ERROR model::read()<h1></div><div>$sql_read</div>";
+            }else{
+                $instance = $query->fetchObject();
+                $this->val($instance);
+                $this->iterator()->Init();
+                $this->OnInstance();
+                $this->iterator()->Attach($this);
+                $MODEL=$this;
+                $MODEL->relations()->each(function(relation $relation)use(&$MODEL){
+                    $relation->val($MODEL->db_id);
+                });
+            }
+        }
+        
+        
+        $this->properties()->Empty();
         return $this;
     }
     
     /**
-     * set model current _state
-     * @param string $set
-     * @return \xuserver\v5\model|string
+     * update model instance or selection
+     * @param mixed $values
      */
-    public function state($set="__NULL__"){
-        if($set!="__NULL__"){
-            $this->_state=$set;
-            return $this;
+    public function update($values="__NULL__"){
+        if( is_array($values) or is_object($values)){
+            $this->val($values);
         }else{
-            return $this->_state;
+            
         }
-    }
-    
-    /**
-     * 
-     * @return \xuserver\v5\sql
-     */
-    public function sql(){
-        return $this->sql;
-    }
-    
-    /**
-     * 
-     * @return \xuserver\v5\iterator
-     */
-    public function iterator(){
-        return $this->_iterator;
-    }
-    
-    /**
-     * 
-     * @return \xuserver\v5\properties
-     */
-    public function properties(){
-        //$this->_properties->Empty();
-        return $this->_properties;
-    }
-    /**
-     *
-     * @return \xuserver\v5\relations
-     */
-    public function relations(){
-        return $this->_relations;
-    }
-    
-    /**
-     * 
-     * @return \xuserver\v5\database
-     */
-    public function db(){
-        return $this->db;
-    }
-    /**
-     * 
-     * @return string|mixed
-     */
-    public function db_tablename(){
-        return $this->db_tablename;
-    }
-    
-    public function db_index(){
-        return $this->db_index;
-    }
-    /**
-     * return db id value
-     */
-    public function db_id($set=""){
-        
-        if($set!=""){
-            $this->db_id=$set;
-            return $this;
+        $sql_update=$this->sql()->statement_update();
+        $query = $this->db->query($sql_update);
+        if(!$query){
+            echo debug("$sql_update");
         }else{
-            return $this->db_id;
+            $this->OnUpdate();
         }
+        $this->properties()->Empty();
+        return $this;
+    }
+    
+    /**
+     * create model instance or selection
+     * @param mixed $values
+     */
+    public function create($values="__NULL__"){
+        if( is_array($values) or is_object($values)){
+            $this->val($values);
+        }else{
+            
+        }
+        $sql_insert=$this->sql()->statement_insert();
+        echo debug("$sql_insert");
         
+        $this->properties()->Empty();
+        return $this;
     }
     
-    
-    
-    public function label(){
-        $label="";
-        $this->properties()->find("text","type")->each(function(property $prop)use(&$label){
-            $label .= " ". $prop->val();
-        });
-        return $label;
+    /**
+     * delete model instance or selection
+     * @param mixed $values
+     */
+    public function delete($values="__NULL__"){
+        echo debug("delete object");
+        
+        $this->properties()->Empty();
+        return $this;
     }
-      
-    
 
 }
+
+
 
 
 
@@ -1283,6 +1494,7 @@ class iterator{
             $this->list[$item->name()]=$item;
         }else{ // elements are DBO::FETCH_OBJ
             $this->_itemType="FETCH_OBJ";
+            //$name= current( (Array)$item ); // first property of stdClass object
             $this->list[]=$item;
         }
         return $this;
@@ -1305,8 +1517,11 @@ class iterator{
      * @param string $name
      * @return \xuserver\v5\iterator|boolean
      */
-    public function Fetch($name=""){
-        if($name==""){
+    public function Fetch($name="__NULL__"){
+        if( is_int($name) or $name===0 ){
+            $name="$name";
+        }
+        if($name=="__NULL__"){
             return $this;
         }
         if(! isset($this->list[$name])){
@@ -1335,9 +1550,13 @@ class iterator{
             if($Empty){
                 $this->selection=array();
             }
+            /*
+            $sort = explode(",", str_replace("#","",$needle));
+            $this->sort($sort,"list");
+            */
             $needle = explode(",", $needle);
-            foreach ($this->list as &$p){
-                foreach ($needle as $value) {
+            foreach ($needle as $value) {
+                foreach ($this->list as &$p){
                     $value=trim($value);
                     if($value==""){
                         continue;
@@ -1352,6 +1571,7 @@ class iterator{
                             }
                             
                         }else{
+                            
                             if(strpos($p->$by(), $value) !==false ){
                                 //echo "<h2> found by $by like $value : ". $p->name() . "</h2>";
                                 $this->Append($p);
@@ -1364,6 +1584,7 @@ class iterator{
                 }
             }
         }
+        
         return $this;
     }
     public function then($needle="__ALL__",$by="name"){
@@ -1432,20 +1653,18 @@ class iterator{
     }
     
     
-    function sort($order=""){
+    function sort($order="",$Context="list"){
         
         if( is_array($order)){
-            
             $ordered = array();
+            $array = &$this->$Context;            
             foreach ($order as $key => $val) {
-                if (array_key_exists($key, $this->list)) {
-                    $ordered[$key] = $this->list[$key];
-                    unset($this->list[$key]);
+                if (array_key_exists($key, $array)) {
+                    $ordered[$key] = $array[$key];
+                    unset($array[$key]);
                 }
             }
-            $this->list= $ordered + $this->list;
-            
-            
+            $array= $ordered + $array;
         }else if($order!="ksort"){
             
         }else{
@@ -1500,7 +1719,6 @@ class iteratorItem{
 }
 
 
-
 class relations extends iterator{
     public function fieldset(){
         $this->each(function($p){
@@ -1510,6 +1728,33 @@ class relations extends iterator{
         return $this;
     }
 }
+
+class methods extends iterator{
+    public function select($set=1){
+        $this->found();
+        $this->each(function($item)use(&$set){
+            $item->is_selected("$set"); 
+        });
+        $this->Empty();
+        return $this;
+    }
+}
+
+class method extends iteratorItem{
+    private $is_selected = 0;
+    public function is_selected($set="__NULL__"){
+        if($set!="__NULL__"){
+            $this->is_selected=$set;
+            return $this;
+        }else{
+            return $this->is_selected;
+        }
+        return $this;
+    }
+}
+
+
+
 class properties extends iterator{
     public function select(){
         $this->found();
@@ -1598,37 +1843,50 @@ class relation extends iteratorItem{
     
 }
 
+
+
+
+
 class property extends iteratorItem{
     
     public $ui="";
     
-    
     private $db_tablename="";
     
     private $fk_tablename="";
-    private $_virtual=0;
-    protected $db_index ="";
-    
     private $realname="";
     
+    private $_virtual=0;
+
+    protected $db_index ="";
     private $db_typelen="";
     private $_values="";
     private $_comment="";
+    private $_caption="";
     
-    //private $selected=0;
+    private $_operator="=";
+    private $_andor="AND";
 
-    //    private $_type="text";
-    //    private $_name="";
-    //    private $_value="";
-    
+    protected $is_hidden=0;
     protected $is_key=0;
-    
     protected $is_disabled=0;
     protected $is_required=0;
     
     
     public function __construct(){
         $this->ui=new property_ui($this);
+    }
+    
+    /**
+     * is propery selected in selection array
+     * @return \xuserver\v5\property|number|string
+     */
+    public function in_selection(){
+        if(isset($this->selection[$this->name()])){
+            return 1;
+        }else{
+            return 0;
+        }
     }
     
     /**
@@ -1788,7 +2046,45 @@ class property extends iteratorItem{
         }
     }
     
-        
+    public function caption($set=""){
+        if($set!=""){
+            $this->_caption=$set;
+            return $this;
+        }else{
+          if($this->_caption==""){
+              return str_replace("_"," ",$this->name());
+          }else{
+              return $this->_caption;
+          }
+        }
+    }
+    
+    public function hidden($set=""){
+        if($set!=""){
+            $this->is_hidden=$set;
+            return $this;
+        }else{
+            return $this->is_hidden;
+        }
+        //
+    }
+    public function disabled($set=""){
+        if($set!=""){
+            $this->is_disabled=$set;
+            return $this;
+        }else{
+            return $this->is_disabled;
+        }
+    }
+    public function required($set=""){
+        if($set!=""){
+            
+            $this->is_required=$set;
+            return $this;
+        }else{
+            return $this->is_required;
+        }
+    }
     
     public function comment($set=""){
         if($set!=""){
@@ -1820,18 +2116,53 @@ class property extends iteratorItem{
         
         if($set!="__NULL__"){
             if($this->is_primarykey()){
-                //debug("<br />set PK ".$name . " : " . $values->$name);
-                $this->Model->db_id($set);
-                $this->Model->state("is_instance");
+                if( is_null($set) or $set=="" or $set=="0" ){
+                    $set = null;
+                }else{
+                    $this->Model->db_id($set);
+                    $this->Model->state("is_instance");
+                }
             }
         }else{
-            
         }
         return parent::val($set);
-        
-        
+    }
+
+    
+    public function like() {
+        $this->_operator = "LIKE";
+        return $this;
+    }
+    public function equals() {
+        $this->_operator = "=";
+        return $this;
     }
     
+    
+    public function condition() {
+        $value = $this->val();
+        if($this->_operator=="="){
+            $condition = $this->_andor. " " . $this->db_tablename().".". $this->realname()."=\"$value\"";
+        }else if($this->_operator=="LIKE"){
+            if($this->type()=="checkbox" or $this->type()=="number" or $this->type()=="pk" or $this->type()=="fk"){
+                $condition = $this->_andor. " " .$this->db_tablename().".". $this->realname()."=\"$value\"";
+            }else{
+                $condition = $this->_andor. " " . $this->db_tablename().".". $this->realname()." LIKE \"%$value%\"";
+            }
+        }
+        return $condition;
+    }
+    
+    public function and() {
+        $this->_andor="AND";
+        return $this;
+    }    
+    public function or() {
+        $this->_andor="OR";
+        return $this;
+    }
+    
+    /*
     public function and() {
         //$list="__AUTO__",$direction="ASC"
         $this->Model->properties()->find(".".$this->name())->where("AND");
@@ -1841,6 +2172,7 @@ class property extends iteratorItem{
         //$list="__AUTO__",$direction="ASC"
         $this->Model->properties()->find(".".$this->name())->where("OR");
     }
+    */
     
     public function asc() {
         //$list="__AUTO__",$direction="ASC"
@@ -1861,7 +2193,7 @@ class model_ui{
     
     public function structure(){
         
-        $uiid = $this->uiid();
+        
         $return="";
         $sql = $this->parent->sql()->statement_current();
         
@@ -1912,9 +2244,9 @@ class model_ui{
         });
         $table.=$lines;
         
-        $date = date("D/M/Y H:s");
+        $date = date("D/M/Y H:i:s");
         
-        $return .= "<div id=\"$uiid-structure\"><h1>structure </h1><table class='table'>$table</table><div class='small'>$date</div></div>";
+        $return .= "<div id=\"model-structure\"><h1>structure </h1><div class='small'>$date</div><table class='table'>$table</table></div>";
         return $return;
     }
     
@@ -1930,8 +2262,14 @@ class model_ui{
          
         $this->parent->properties()->each(function($prop)use(&$thead,&$cntspan){
             if($prop->is_selected()){
-                $thead.="<th>".$prop->name()."</th>";
-                $cntspan++;
+                if($prop->type()=="password"){
+                    $thead.="";                                
+                }else{
+                    $thead.="<th>".$prop->name()."</th>";
+                    $cntspan++;                                
+                }                        
+                
+                
             }
         })
         ;
@@ -1941,7 +2279,7 @@ class model_ui{
         $this->parent->iterator()->each(function($item)use(&$tbody,&$cnt){
             $tbody .= "<tr>";
             $cnt++;
-            $item->properties()->each(function($prop)use(&$tbody,&$cnt){
+            $item->properties()->each(function(property $prop)use(&$tbody,&$cnt){
                 if($prop->is_selected()){
                     if($prop->type()=="file"){
                         $tbody.="<td>file</td>";
@@ -1951,9 +2289,17 @@ class model_ui{
                         }else{
                             $tbody.="<td>No</td>";
                         }
-                            
+                    }else if($prop->type()=="password"){                                        
+                        $tbody.="";
                     }else{
-                        $tbody.="<td>".$prop->val()."</td>";
+                        if($prop->is_primarykey() ){
+                            $tbody.="<td><a href='".$prop->db_tablename() ."-".$prop->val()."' class='xs-link' >#".$prop->val()."</a></td>";
+                        }else if($prop->type()=="fk"){
+                            $tbody.="<td><a href='".$prop->fk_tablename() ."-".$prop->val()."' class='xs-link' >".$prop->val()."</a></td>";
+                        }else{
+                            $tbody.="<td>".$prop->val()."</td>";
+                        }
+
                     }
                 }
             });
@@ -1963,7 +2309,8 @@ class model_ui{
         ;
         
         $this->parent->properties()->Empty();
-        $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows found</th></tr>";
+        $link=$this->parent->db_tablename();
+        $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows <a href='$link-0' class='xs-link' >found</a></th></tr>";
         return "<div id=\"$uiid-table\"><table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table></div>";
     }
     
@@ -1988,21 +2335,30 @@ class model_ui{
         });
         ;
         
-        $date = date("D/M/Y H:s");
-        return "<form id=\"$uiid-form\" method='post'>
-            <h3>$uiid</h3>".
-            "<div>
-                <input type='hiddens' name='model_build' value='$uiid' />
-                <input type='hiddens' name='method' value='' />
+        $methods = "";
+        
+        $this->parent->methods()->all(function($item)use(&$methods){
+            if($item->is_selected()){
+                $name=$item->name();
+                $methods.="<input type='submit' name='form_submit' value = '$name' /> ";
+            }; 
+        });
+        
+        $date = date("D/M/Y H:i:s");
+        $formid= $this->parent->db_tablename();
+        $state=$this->parent->state();
+        return "<form id=\"$formid-form\" method='post'>
+            <h3>$formid</h3>
+            <div class='small'>$state $uiid $date</div>
+            <div>
+                <input type='hidden' name='model_build' value='$uiid' />
+                <input type='hidden' name='method' value='' />
             </div>".
             $return.
             "<div>
-                <input type='submit' name='form_submit' value = 'create' />
-                <input type='submit' name='form_submit' value = 'read' />
-                <input type='submit' name='form_submit' value='update' />
-                <input type='submit' name='form_submit' value = 'delete' />
+                $methods
              </div>
-             <div class='small'>$date</div>
+             
             </form>";
     }
 }
@@ -2033,13 +2389,14 @@ class property_ui{
     }
     public function input(){
         $required ="";  $disabled ="";
-        if ($this->parent->is("disabled")) {$disabled="disabled='disabled'";}
-        if ($this->parent->is("required")) {$required="required='required'";}
+        if ($this->parent->disabled()) {$disabled="disabled='disabled'";}
+        if ($this->parent->required()) {$required="required='required'";}
+        if ($this->parent->hidden()) {$this->parent->type("hidden");}
         
         if ($this->parent->is_primarykey()) {
             $input="<input class='form-control' type=\"hidden\" $required $disabled name='".$this->parent->name()."' id='".$this->formid()."' value=\"".$this->parent->val()."\"  />";
             
-        }else if ($this->parent->type() == "xhtml") {
+        }else if ($this->parent->type() == "textarea") {
             if ($this->parent->val() == "") {$xhtml = "";}else {$xhtml = $this->parent->val();}
             $input = "<textarea class='form-control' $required $disabled rows='3' cols='50' autocomplete='false' name='".$this->parent->name()."' id='".$this->formid()."'>" . ($xhtml) . "</textarea>";
         }else if ($this->parent->type()=="select"){
@@ -2069,26 +2426,57 @@ class property_ui{
             }
             
             $input = $input."$options</select>";
-        }else if($this->parent->type()=="checkbox"){
-            
-            if($this->parent->attr("db_typelen")>1){
-                if ($this->parent->val() == "1") {
-                    $CHECKED1 = "checked='checked'";
-                    $CHECKED0 = "";
-                    $CHECKED = "";
-                }else if ($this->parent->val() == "0") {
-                    $CHECKED1 = "";
-                    $CHECKED0 = "checked='checked'";
-                    $CHECKED = "";
-                }else{
-                    $CHECKED1 = "";
-                    $CHECKED0 = "";
-                    $CHECKED = "checked='checked'";
-                }
-                $input="<label>true <input type=\"radio\" $required $disabled $CHECKED1 name='".$this->parent->name()."' value=\"1\" placeholder=\"".$this->parent->comment()."\" /></label> ";
-                $input.="<label>false <input type=\"radio\" $required $disabled $CHECKED0 name='".$this->parent->name()."' value=\"0\" placeholder=\"".$this->parent->comment()."\" /></label> ";
-                $input.="<label>both <input type=\"radio\" $required $disabled $CHECKED name='".$this->parent->name()."' value=\"\" placeholder=\"".$this->parent->comment()."\" /></label> ";
+        }else if($this->parent->type()=="radio"  ){
+            if ($this->parent->val() == "1") {
+                $CHECKED1 = "checked='checked'";
+                $CHECKED0 = "";
+                $CHECKED = "";
+            }else if ($this->parent->val() == "0") {
+                $CHECKED1 = "";
+                $CHECKED0 = "checked='checked'";
+                $CHECKED = "";
             }else{
+                $CHECKED1 = "";
+                $CHECKED0 = "";
+                $CHECKED = "checked='checked'";
+            }
+            $idd= rand();
+            $input1="<input id='$idd-1' type=\"radio\" $required $disabled $CHECKED1 name='".$this->parent->name()."' value=\"1\" placeholder=\"".$this->parent->comment()."\" /> ";
+            $input0="<input id='$idd-0' type=\"radio\" $required $disabled $CHECKED0 name='".$this->parent->name()."' value=\"0\" placeholder=\"".$this->parent->comment()."\" /> ";
+            $inputB="<input id='$idd-B' type=\"radio\" $required $disabled $CHECKED name='".$this->parent->name()."' value=\"\" placeholder=\"".$this->parent->comment()."\" />";
+            
+            $input="
+            <div class='form-check'>
+                $input1
+                <label class='form-check-label' for='$idd-1'>Yes</label>
+            </div>
+            <div class='form-check'>
+                $input0
+                <label class='form-check-label' for='$idd-0'>No</label>
+            </div>
+            <div class='form-check'>
+                $inputB
+                <label class='form-check-label' for='$idd-B'>Both</label>
+            </div>                        
+        ";
+            
+            
+/*
+<div class='form-check form-check-inline'>
+  <input class='form-check-input' type='radio' name='inlineRadioOptions' id='inlineRadio1' value='option1'>
+  <label class='form-check-label' for='inlineRadio1'>1</label>
+</div>
+<div class='form-check form-check-inline'>
+  <input class='form-check-input' type='radio' name='inlineRadioOptions' id='inlineRadio2' value='option2'>
+  <label class='form-check-label' for='inlineRadio2'>2</label>
+</div>
+<div class='form-check form-check-inline'>
+  <input class='form-check-input' type='radio' name='inlineRadioOptions' id='inlineRadio3' value='option3' disabled>
+  <label class='form-check-label' for='inlineRadio3'>3 (disabled)</label>
+</div>
+*/        
+        }else if($this->parent->type()=="checkbox" ){
+            
                 if ($this->parent->val() == "1") {
                     //$input->addAttribute("checked", "checked");
                     $CHECKED = "checked='checked'";
@@ -2096,18 +2484,10 @@ class property_ui{
                     $CHECKED = "";
                 }
                 $input="<input class='form-check-input' type=\"".$this->parent->type()."\" $required $disabled $CHECKED name='".$this->parent->name()."' id='".$this->formid()."' value=\"1\" placeholder=\"".$this->parent->comment()."\" />";
-            }
             
-            /*
-            if ($this->parent->val() == "1") {
-                //$input->addAttribute("checked", "checked");
-                $CHECKED = "checked='checked'";
-            }else{
-                $CHECKED = "";
-            }
-            $input="<input type=\"".$this->parent->type()."\" $required $disabled $CHECKED name='".$this->parent->name()."' value=\"1\" placeholder=\"".$this->parent->comment()."\" />";
-            */
             
+        }else if($this->parent->type()=="password"){
+            $input="<input class='form-control' type=\"".$this->parent->type()."\" $required $disabled name='".$this->parent->name()."' id='".$this->formid()."' value=\"\" placeholder=\"".$this->parent->comment()."\" />";
         }else{
             $input="<input class='form-control' type=\"".$this->parent->type()."\" $required $disabled name='".$this->parent->name()."' id='".$this->formid()."' value=\"".$this->parent->val()."\" placeholder=\"".$this->parent->comment()."\" />";
         }
@@ -2116,18 +2496,19 @@ class property_ui{
     
     public function row(){
         $p = $this->parent;
+        if ($p->required()) {$required="*";}else{$required="";}
         if($p->is_primarykey()){
             return "
             <div class='form-group'>
                 ".$p->ui->input()." 
             </div>"; 
-        }else if($p->type()=="checkbox" and $this->parent->attr("db_typelen")<=1 ){
+        }else if($p->type()=="checkbox" ){
             $classlabel="form-check-label";
             $classdiv="form-check";
             return "
             <div class='form-group $classdiv'>
                 <label class='form-group $classlabel' for='".$this->formid()."'>
-                ".$p->ui->input()." ".$p->name()."
+                ".$p->ui->input()." ".$p->caption()." $required
                 </label>
                 <small class='form-text text-muted'>".$p->comment()."</small>
             </div>"; 
@@ -2137,7 +2518,7 @@ class property_ui{
             $classdiv="";
             return "
             <div class='form-group $classdiv'>
-                <label class='form-group $classlabel' for='".$this->formid()."'>".$p->name()."</label>
+                <label class='form-group $classlabel' for='".$this->formid()."'>".$p->caption()." $required</label>
                 ".$p->ui->input()."
                 <small class='form-text text-muted'>".$p->comment()."</small>
             </div>";

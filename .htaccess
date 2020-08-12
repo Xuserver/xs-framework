@@ -1,0 +1,4 @@
+RewriteEngine on
+RewriteRule ^([a-z]+)/([a-z]+)/([0-9]+)/(.*)$ index.php?mci=$1&id=$2&&method=$3&param=$4
+
+
