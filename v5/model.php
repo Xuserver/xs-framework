@@ -165,7 +165,7 @@ class database{
      * @param string $stmt
      * @return \PDO 
      */
-    public function query(string $stmt){
+    public function query(string $stmt){ 
         $ret= $this->pdo->query($stmt);
         return $ret;
     }
@@ -1058,6 +1058,10 @@ class modelPublic extends modelProtected{
  */
 class model extends modelPublic{
 
+    
+    function lop(){
+        
+    }
     /**
      * build model properties, relations and methods
      * @todo implement methods
