@@ -2496,7 +2496,7 @@ class property_ui{
             $input="<input class='form-control' type=\"".$this->parent->type()."\" $required $disabled name='".$this->parent->name()."' id='".$this->formid()."' value=\"".$this->parent->val()."\" placeholder=\"".$this->parent->comment()."\" />";
         }
         return $input;
-    }
+    } 
     
     public function row(){
         $p = $this->parent;
