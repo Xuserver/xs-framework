@@ -15,6 +15,8 @@
     define('XUSERVER_DB_PASSWORD',"");  // Database password
  
 
+
+
 spl_autoload_register(function($class){
     $class=str_replace('xuserver\\', '', $class);
     require $_SERVER["DOCUMENT_ROOT"]."/xs-framework/".str_replace('\\', '/', $class).".php";
