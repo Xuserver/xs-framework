@@ -10,9 +10,9 @@
 
     
     define('XUSERVER_DB_SERVER',"localhost");   // Database server internet address
-    define('XUSERVER_DB_NAME',"");     // Database name
+    define('XUSERVER_DB_NAME',"bjas_prod");     // Database name
     define('XUSERVER_DB_USERNAME',"root");   // Database username
-    define('XUSERVER_DB_PASSWORD',"");  // Database password
+    define('XUSERVER_DB_PASSWORD',"gaelloic");  // Database password
  
 
 spl_autoload_register(function($class){
