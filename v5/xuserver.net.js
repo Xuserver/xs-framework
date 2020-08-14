@@ -36,7 +36,13 @@ $( document ).ready(function() {
 	xsLayout();
     duplicateIDs($("body"))
     ajaxResponse($("body"));
-	$myScreen = $("#myScreen")
+	$myScreen = $("#xs-screen")
+	if($myScreen.length != 1){
+		$myScreen = $("body")
+	}else{
+		
+	}
+		
 });
 
 
@@ -101,11 +107,41 @@ function ajaxResponse(html){
     console.groupCollapsed("xs class")
     console.log(".xs-link")
     $html.find("a.xs-link").click(function(e) {
-		var fd = new FormData();
-		fd.append("method","form");
-		fd.append("model_build",$(this).attr("href"));
+    	var $link = $(this);
+    	var fd = new FormData();
+    	fd.append("model_build",$link.attr("href"));
+    	fd.append("method",$link.attr("method"));
+		
 		fdPost(fd)
 		e.preventDefault();
+	});
+    
+    $html.find("button.close").click(function(e) {
+    	var $link = $(this);
+    	$link.parent().remove()
+	});
+    
+    $html.find("table").each(function() {
+    	var $table = $(this);
+		if(! $table.hasClass("xs-table")){
+			$table.addClass("xs-table").find("a.xs-action").each(function(){
+				var $link = $(this);
+				$link.click(function(e){
+					var fd = new FormData();
+					fd.append("model_build",$link.attr("href"));
+					fd.append("method",$link.attr("method"));
+					
+					
+					$table.find("input.xs-action").each(function(e){
+						 if($(this).prop('checked')){
+							 fd.append($(this).attr('name'),$(this).attr('value'))
+						 }
+					 });
+					fdPost(fd)
+					e.preventDefault();
+				});
+			});
+		}
 	});
     
     console.log(".xs-notify")
@@ -128,7 +164,7 @@ function ajaxResponse(html){
 		$ajaxForm($form);
 		$ajaxResponseDispatchNode($form)
 	});
-	
+    
 	$html.find("div[id]").each(function() {
     	var $element = $(this);
         $ajaxResponseDispatchNode($element)
@@ -187,7 +223,6 @@ function fdPost(fd){
 		 contentType: false,
 		 cache: false,
 		 success: function(data) {
-			 
 			 ajaxResponse(data);
 		 },
 		 complete: function() {
@@ -201,7 +236,8 @@ function $ajaxResponseDispatchNode(element){
 	if(element.attr("id")==""){
         return false;
 	}else{
-    	var existing = $body.find(selector);
+		
+		var existing = $body.find(selector);
     	if(existing==undefined){
     		return false;
     	}

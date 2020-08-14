@@ -165,27 +165,59 @@ class database{
      * @param string $stmt
      * @return \PDO 
      */
-    public function query(string $stmt){ 
-        $ret= $this->pdo->query($stmt);
-        return $ret;
+    public function query(string $sql){ 
+        try{
+            $return= $this->pdo->query($sql);
+        }catch(\Exception $e){
+            echo notify("<div id='model-structure'><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
+            $return=false;
+        }
+        return $return;
     }
     
     /**
-     * @deprecated
+     * 
      */
-    public function execute(string $stmt,$data=""){
-        $stmt = $this->pdo->prepare($stmt);
+    public function execute($sql,$data=""){
+        $this->lastInsertId="";
         try {
+            $statement = $this->pdo->prepare($sql);
             $this->pdo->beginTransaction();
-            foreach ($data as $row){
-                $stmt->execute($row);
+            try{
+                $statement->execute($data);
+                $this->lastInsertId =  $this->pdo->lastInsertId();
+                $this->pdo->commit();
+                $return = true;
+            }catch(\Exception $e){
+                $this->lastInsertId="";
+                echo notify("<div id='model-structure'><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
+                $this->pdo->rollback();
+                $return = false;
             }
-            $this->pdo->commit();
-        }catch (\Exception $e){
+        } catch(\Exception $e) {
             $this->pdo->rollback();
+            $this->lastInsertId="";
+            echo notify("<div id='model-structure'><code>$sql</code>".$e->getCode() . $e->getMessage() ."</div>" );
             throw $e;
+            $return = false;
+        }
+        
+        return $return;
+    }
+    /*
+    public function EXEC(string $sql,$data=""){
+        try {
+            $statement = $this->pdo->prepare($sql);
+            $this->pdo->beginTransaction();
+            $statement->execute($data);
+            $this->lastInsertId =  $this->pdo->lastInsertId();
+            $this->pdo->commit();
+        } catch(\PDOException $e) {
+            $this->pdo->rollback();
+            print "Error!: " . $e->getMessage() . "</br>";
         }
     }
+    */
     
     /**
      * get database driver name (mysql or postgree)
@@ -210,6 +242,7 @@ class sql{
     private $Model;
     private $_sqlstmt="";
     private $_sqltype="SELECT";
+    // COMMON & SELECT
     private $_SELECT;
     private $_FROM;
     private $_JOIN;
@@ -217,11 +250,13 @@ class sql{
     private $_ORDERBY;
     private $_LIMIT;
     private $_OFFSET;
-    
+    // UPDATE
     private $_SET;
-    
+    // INSERT INTO
     private $_INTO;
     private $_VALUES;
+    // DELETE
+    private $_DELETE;
     
     public function __construct(model&$model) {
         $this->Model=$model;
@@ -255,6 +290,7 @@ class sql{
 
         $this->_INTO=array();
         $this->_VALUES=array();
+        $this->_DELETE=array();
         return $this;
     }
     
@@ -389,7 +425,7 @@ class sql{
     public function insert( $list="__AUTO__") {
         /*
          INSERT INTO table_name (column1 , column2 ...)
-         VALUES ('val1', 'val2' ...)
+         _VALUES ('val1', 'val2' ...)
          */
         $this->_sqltype="INSERT_INTO";
         if($list=="__AUTO__"){
@@ -400,7 +436,8 @@ class sql{
                 $val = $PROPERTY->val();
                 if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
                     $self->_INTO[$PROPERTY->name()]= $PROPERTY->realname() ;
-                    $self->_VALUES[$PROPERTY->name()]="\"$val\"" ;
+                    $self->_VALUES[$PROPERTY->name()]=$val ;
+                    //$self->_VALUES[$PROPERTY->name()]=":".$PROPERTY->realname() ;
                     //echo "349";
                 }else{
                     
@@ -419,6 +456,26 @@ class sql{
         return $this;
     }
     
+    public function delete( $list="__AUTO__") {
+        /*
+         DELETE FROM table WHERE 
+         */
+        $this->_sqltype="DELETE";
+        if($list=="__AUTO__"){
+            $this->from();
+            $this->_DELETE=$this->_JOIN;
+            $this->_LIMIT="";
+            $this->_OFFSET="";
+        }else{
+
+        }
+        return $this;
+    }
+    
+    
+    public function values(){
+        return $this->_VALUES;
+    }
     
     /**
      * where sql clause
@@ -438,7 +495,14 @@ class sql{
         if($list=="__AUTO__"){
             $this->_WHERE=array();
             if($case =="is_instance"){
-                $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()."=\"".$this->Model->db_id()."\"";
+                
+                if(is_array($this->Model->db_id())){
+                    $_IN = "'".implode("','", $this->Model->db_id())."'";
+                    $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()." IN($_IN)";
+                }else{
+                    $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()."=\"".$this->Model->db_id()."\"";
+                }
+                
                 
                 //echo "<div id='sss'>why ?</div>";
                 
@@ -615,9 +679,29 @@ class sql{
         }else if($this->_sqltype=="INSERT_INTO"){
             
             $_INTO = implode(", ", $this->_INTO);
-            $_VALUES = implode(", ", $this->_VALUES);
+            $_INTOPREPARE = ":".implode(",:", $this->_INTO);
+            //$_VALUES = implode(", ", $this->_VALUES);
             $TABLE = $this->Model->db_tablename();
-            $this->_sqlstmt="INSERT INTO $TABLE($_INTO) VALUES ($_VALUES) ";
+            $this->_sqlstmt="INSERT INTO $TABLE($_INTO) VALUES ($_INTOPREPARE) ";
+            
+        }else if($this->_sqltype=="DELETE"){
+            //$TABLE = implode(", ", $this->_DELETE);
+            $TABLE = $this->Model->db_tablename();
+            
+            if(count($this->_WHERE)>0){
+                $firstkey = NULL;
+                foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
+                if (null === $firstkey) {
+                    $_WHERE="";
+                }else{
+                    $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
+                    $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
+                }
+            }else{
+                $_WHERE ="";
+            }
+            
+            $this->_sqlstmt="DELETE FROM $TABLE $_WHERE  ";
             
         }
         return $this->_sqlstmt;
@@ -650,7 +734,7 @@ class sql{
     }
     
     /**
-     * sql statement to update an instance of Model model
+     * sql statement to update an instance or selection
      * @return string
      */
     public function statement_update(){
@@ -659,11 +743,20 @@ class sql{
     }
     
     /**
-     * sql statement to update an instance of Model model
+     * sql statement to update an instance or selection
      * @return string
      */
     public function statement_insert(){
         $sql = $this->insert()->statement();
+        return $sql;
+    }
+    
+    /**
+     * sql statement to delete an instance 
+     * @return string
+     */
+    public function statement_delete(){
+        $sql = $this->delete()->where()->statement();
         return $sql;
     }
     
@@ -1029,6 +1122,7 @@ class modelPublic extends modelProtected{
     public function db_id($set=""){
         
         if($set!=""){
+            $this->state("is_instance");
             $this->db_id=$set;
             return $this;
         }else{
@@ -1059,9 +1153,7 @@ class modelPublic extends modelProtected{
 class model extends modelPublic{
 
     
-    function lop(){
-        
-    }
+
     /**
      * build model properties, relations and methods
      * @todo implement methods
@@ -1133,10 +1225,7 @@ class model extends modelPublic{
                 if (isset($row["Comment"])) {
                     $property->comment($row["Comment"]);
                 }
-                if (isset($row["Default"])) {
-                    //$property->val($row["Default"]);
-                }
-                
+                $property->default($row["Default"]);
                 
             }
             $this->sql()->build();
@@ -1287,6 +1376,7 @@ class model extends modelPublic{
             $sql_read=$this->sql()->statement_read_selection();
             try {
                 $qry = $this->db->query($sql_read);
+                //echo debug($sql_read);
                 $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
                 $this->iterator()->Init();
                 $this->OnSelection();
@@ -1301,7 +1391,7 @@ class model extends modelPublic{
             }            
             
         }else{
-            $this->state("is_instance");
+            
             $this->db_id($id);
             $sql_read=$this->sql()->statement_read_instance();
             //notify($sql_read);
@@ -1359,10 +1449,13 @@ class model extends modelPublic{
             
         }
         $sql_insert=$this->sql()->statement_insert();
-        echo debug("$sql_insert");
-        
+        $this->db->execute($sql_insert,$this->sql()->values());
+        $this->OnCreate();
         $this->properties()->Empty();
-        return $this;
+        
+        $return = Build($this->db_tablename());
+        $return->read($this->db->lastInsertId);
+        return $return;
     }
     
     /**
@@ -1370,10 +1463,24 @@ class model extends modelPublic{
      * @param mixed $values
      */
     public function delete($values="__NULL__"){
-        echo debug("delete object");
+        if( is_array($values) or is_object($values)){
+            $this->val($values);
+        }else{
+            
+        }
+        $return = Build($this->db_tablename());
         
+        
+        $sql_delete=$this->sql()->statement_delete();
+        
+        
+        echo notify($sql_delete);
+        $this->db->execute($sql_delete,$this->sql()->values());
+        $this->OnDelete();
         $this->properties()->Empty();
-        return $this;
+        
+        $return->read();
+        return $return;
     }
 
 }
@@ -1866,6 +1973,7 @@ class property extends iteratorItem{
     private $db_typelen="";
     private $_values="";
     private $_comment="";
+    private $_default="";
     private $_caption="";
     
     private $_operator="=";
@@ -2099,6 +2207,23 @@ class property extends iteratorItem{
         }
     }
     
+    public function default($set=""){
+        if($set!=""){
+            $this->_default=$set;
+            return $this;
+        }else{
+            return $this->_default;
+        }
+    }
+    
+    public function has_default(){
+        if($this->_default==="" or is_null($this->_default) ){
+            return 0;
+        }else{
+            return 1;
+        }
+    }
+    
     public function values($arr) {
         $this->_type = "select";
         if (is_array($arr)) { //given an array of values
@@ -2258,11 +2383,12 @@ class model_ui{
     
     
     public function table(){
-        $uiid = $this->uiid();
+        $uiid = $this->parent->db_tablename();
         $thead = "<thead>";
         $tbody = "<tbody>";
         $thead .= "<tr>";
-        $cntspan = 0;
+        $thead.="<th>action</th>";
+        $cntspan = 1;
          
         $this->parent->properties()->each(function($prop)use(&$thead,&$cntspan){
             if($prop->is_selected()){
@@ -2282,6 +2408,8 @@ class model_ui{
         $cnt = 0;
         $this->parent->iterator()->each(function($item)use(&$tbody,&$cnt){
             $tbody .= "<tr>";
+            $db_id=$item->db_id();
+            $tbody.="<td><input type='checkbox' class='xs-action' name=\"ids[]\" value=\"$db_id\" /></td>";
             $cnt++;
             $item->properties()->each(function(property $prop)use(&$tbody,&$cnt){
                 if($prop->is_selected()){
@@ -2297,9 +2425,9 @@ class model_ui{
                         $tbody.="";
                     }else{
                         if($prop->is_primarykey() ){
-                            $tbody.="<td><a href='".$prop->db_tablename() ."-".$prop->val()."' class='xs-link' >#".$prop->val()."</a></td>";
+                            $tbody.="<td><a href='".$prop->db_tablename() ."-".$prop->val()."' method='form' class='xs-link' >#".$prop->val()."</a></td>";
                         }else if($prop->type()=="fk"){
-                            $tbody.="<td><a href='".$prop->fk_tablename() ."-".$prop->val()."' class='xs-link' >".$prop->val()."</a></td>";
+                            $tbody.="<td><a href='".$prop->fk_tablename() ."-".$prop->val()."' method='form' class='xs-link' >".$prop->val()."</a></td>";
                         }else{
                             $tbody.="<td>".$prop->val()."</td>";
                         }
@@ -2314,8 +2442,14 @@ class model_ui{
         
         $this->parent->properties()->Empty();
         $link=$this->parent->db_tablename();
-        $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows <a href='$link-0' class='xs-link' >found</a></th></tr>";
-        return "<div id=\"$uiid-table\"><table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table></div>";
+        $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows 
+        <a href='$link-0' method='form' class='xs-link' >found</a> | 
+        <a href='$link-0' method='create' class='xs-link' >create</a> | 
+        <a href='$link-0' method='delete' class='xs-action' >delete</a> 
+        </th></tr>";
+        return "<div id=\"$uiid-table\">
+            <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>
+            <table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table></div>";
     }
     
     private function uiid(){
@@ -2351,7 +2485,8 @@ class model_ui{
         $date = date("D/M/Y H:i:s");
         $formid= $this->parent->db_tablename();
         $state=$this->parent->state();
-        return "<form id=\"$formid-form\" method='post'>
+        return "<form id=\"$formid-form\" method='post' class='shadow p-3 mb-5 bg-white rounded'>
+            <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>
             <h3>$formid</h3>
             <div class='small'>$state $uiid $date</div>
             <div>

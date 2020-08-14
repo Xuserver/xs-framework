@@ -21,12 +21,22 @@ if(count($_POST)>0){
     if(isset($_POST["method"])){
         $method = $_POST["method"];
         
-        if($method=="update"){
+        
+        
+        if($method=="create"){
             $obj = buildInstance($_POST["model_build"]);
-            $obj->val($_POST);
-            $obj->update();
-            echo $obj->ui->form();
-            //echo debug("object updated");
+            if($obj->state()=="is_selection"){
+                $obj->db_id("-1");
+                echo $obj->ui->form();
+            }else{
+                $obj->val($_POST);
+                $new = $obj->create();
+                $blank = Build($new->db_tablename())->read();
+                echo notify("created");
+                echo $blank->ui->table().$new->ui->form();
+            }
+            
+            
         }else if($method=="read"){
             $a= explode("-", $_POST["model_build"]);
             $obj = Build($a[0]);
@@ -39,7 +49,31 @@ if(count($_POST)>0){
             $obj->read();
             $table = $obj->ui->table();
             echo debug($obj->sql()->statement_current());
-            echo $form.$table;            
+            echo $form.$table;
+            
+        }else if($method=="update"){
+            $obj = buildInstance($_POST["model_build"]);
+            $obj->val($_POST);
+            $obj->update();
+            echo notify("updated");
+            echo $obj->ui->form();
+            
+        }else if($method=="delete"){
+            $obj = buildInstance($_POST["model_build"]);
+            if($obj->state()=="is_selection"){
+                if(isset($_POST["ids"])){
+                    $empty = $obj->db_id($_POST["ids"])->delete();
+                    echo $empty->ui->table();
+                }else{
+                    
+                }
+                
+            }else{
+                //$empty = $obj->delete();
+                echo $empty->ui->table();
+            }
+            
+            
             
         }else if($method=="form"){
             $a= explode("-", $_POST["model_build"]);

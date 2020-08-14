@@ -14,11 +14,9 @@ class auth_user extends \xuserver\v5\model{
     }
     
     protected function OnInstance(){
-        $this->properties()->find("my_lastname, my_firstname")->select();
-        $this->methods()->select(0)->find("#update")->select(1);
+        $this->properties()->find("email,my_lastname, my_firstname")->select();
+        $this->methods()->select(0)->find("#update,#create")->select(1);
     }
-    
-    
     
     public function form_account(){
         $session = session();
