@@ -187,7 +187,7 @@ class database{
                 $statement->execute($data);
                 $this->lastInsertId =  $this->pdo->lastInsertId();
                 $this->pdo->commit();
-                $return = true;
+                $return = $statement;
             }catch(\Exception $e){
                 $this->lastInsertId="";
                 echo notify("<div id='model-structure'><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
@@ -394,17 +394,53 @@ class sql{
     public function update( $list="__AUTO__") {
         /*
          UPDATE table_name
-         SET column1 = value1, column2 = value2, ...
+         SET column1 = :column1, column2 = :column2, ...
+         */
+        $this->_sqltype="PUPDATE";
+        if($list=="__AUTO__"){
+            $this->_SET=array();
+            $this->_VALUES=array();
+            $self=$this;
+            $this->Model->properties()->each(function( property $PROPERTY) use(&$self){
+                $value = $PROPERTY->val();
+                if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
+                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = :".$PROPERTY->name() ;
+                    $self->_VALUES[$PROPERTY->name()]=$value ;
+                }else{
+                    
+                }
+                
+            })->Empty();
+            ;
+            $this->from();
+            $this->_LIMIT="";
+            $this->_OFFSET="";
+        }else if($list==""){
+            
+        }else{
+            $this->_SET=explode(",", $list);
+        }
+        return $this;
+    }
+    
+    /**
+     * 
+     * @deprecated
+     * @return \xuserver\v5\sql
+     */
+    public function old_update( $list="__AUTO__") {
+        /*
+         UPDATE table_name
+         SET column1 = :column1, column2 = :column2, ...
          */
         $this->_sqltype="UPDATE";
         if($list=="__AUTO__"){
             $this->_SET=array();
             $self=$this;
             $this->Model->properties()->each(function( property $PROPERTY) use(&$self){
-                $val = $PROPERTY->val();
+                $value = $PROPERTY->val();
                 if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
-                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = \"$val\"" ;
-                    //echo "349";
+                    $self->_SET[]=$PROPERTY->db_tablename() . "." . $PROPERTY->realname() ." = \"$value\"" ;
                 }else{
                     
                 }
@@ -437,12 +473,8 @@ class sql{
                 if($PROPERTY->is_selected() and !$PROPERTY->is_primarykey() ){
                     $self->_INTO[$PROPERTY->name()]= $PROPERTY->realname() ;
                     $self->_VALUES[$PROPERTY->name()]=$val ;
-                    //$self->_VALUES[$PROPERTY->name()]=":".$PROPERTY->realname() ;
-                    //echo "349";
                 }else{
-                    
                 }
-                
             })->Empty();
             ;
             $this->from();
@@ -494,6 +526,7 @@ class sql{
         
         if($list=="__AUTO__"){
             $this->_WHERE=array();
+            
             if($case =="is_instance"){
                 
                 if(is_array($this->Model->db_id())){
@@ -503,8 +536,44 @@ class sql{
                     $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()."=\"".$this->Model->db_id()."\"";
                 }
                 
+            }else{
+                $this->Model->properties()->each(function( property $PROPERTY) use(&$self,&$andor){
+                    $value = $PROPERTY->val();
+                    if($value=="" or is_null($value) ){
+                        
+                    }else{
+                        $this->_WHERE[$PROPERTY->name()] = $PROPERTY->pcondition();
+                        $self->_VALUES["where_".$PROPERTY->name()]=$value ;
+                    }
+                })->Fill();
+            }
+        }else if(is_null($list)){
+            $this->_WHERE=array();
+        }else{
+            $this->_WHERE=explode(",", $list);
+        }
+        return $this;
+    }
+    
+    /**
+     * @deprecated
+     */
+    
+    public function old_where($list="__AUTO__",$andor="AND") {
+        $self=$this;
+        $case = $self->Model->state();
+        
+        if($list=="__AUTO__"){
+            $this->_WHERE=array();
+            
+            if($case =="is_instance"){
                 
-                //echo "<div id='sss'>why ?</div>";
+                if(is_array($this->Model->db_id())){
+                    $_IN = "'".implode("','", $this->Model->db_id())."'";
+                    $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()." IN($_IN)";
+                }else{
+                    $this->_WHERE[$this->Model->db_index()] = $this->Model->db_tablename().".".$this->Model->db_index()."=\"".$this->Model->db_id()."\"";
+                }
                 
             }else{
                 $this->Model->properties()->each(function( property $PROPERTY) use(&$self,&$andor){
@@ -514,19 +583,6 @@ class sql{
                     }else{
                         $this->_WHERE[$PROPERTY->name()] = $PROPERTY->condition();
                     }
-                    
-                    /*
-                    $value = $PROPERTY->val();
-                    if($value=="" or is_null($value) ){
-                         
-                    }else{
-                        if($PROPERTY->type()=="checkbox" or $PROPERTY->type()=="number" or $PROPERTY->type()=="pk" or $PROPERTY->type()=="fk"){
-                            $this->_WHERE[$PROPERTY->name()] = " $andor " . $PROPERTY->db_tablename().".". $PROPERTY->realname()."=\"$value\"";
-                        }else{
-                            $this->_WHERE[$PROPERTY->name()] = " $andor " . $PROPERTY->db_tablename().".". $PROPERTY->realname()." LIKE \"%$value%\"";
-                        }
-                    }
-                    */
                 })->Fill();
             }
         }else if(is_null($list)){
@@ -618,6 +674,7 @@ class sql{
     public function statement(){
         $self=$this;
         $case = $self->Model->state() ;
+        
         if($this->_sqltype=="SELECT"){
             $_SELECT = implode(", ", $this->_SELECT);
             //$_JOIN = implode(" ", $this->_JOIN);
@@ -644,43 +701,25 @@ class sql{
                     $_OFFSET = $this->_OFFSET;
                 }
             }
-            
-            if(count($this->_WHERE)>0){
-                $firstkey = NULL;
-                foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
-                if (null === $firstkey) {
-                    $_WHERE="";
-                }else{
-                    $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
-                    $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
-                }
-            }else{
-                $_WHERE ="";
-            }
+            $_WHERE = $this->strWhere();
             $this->_sqlstmt="SELECT $_SELECT FROM $this->_FROM $_WHERE $_ORDERBY $_LIMIT $_OFFSET";
+            
+        }else if($this->_sqltype=="PUPDATE"){
+            
+            $_SET = implode(", ", $this->_SET);
+            $_WHERE = $this->strWhere();
+            $this->_sqlstmt="UPDATE $this->_FROM SET $_SET $_WHERE ";
             
         }else if($this->_sqltype=="UPDATE"){
             
             $_SET = implode(", ", $this->_SET);
-            if(count($this->_WHERE)>0){
-                $firstkey = NULL;
-                foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
-                if (null === $firstkey) {
-                    $_WHERE="";
-                }else{
-                    $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
-                    $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
-                }
-            }else{
-                $_WHERE ="";
-            }
+            $_WHERE = $this->strWhere();
             $this->_sqlstmt="UPDATE $this->_FROM SET $_SET $_WHERE ";
             
         }else if($this->_sqltype=="INSERT_INTO"){
             
             $_INTO = implode(", ", $this->_INTO);
             $_INTOPREPARE = ":".implode(",:", $this->_INTO);
-            //$_VALUES = implode(", ", $this->_VALUES);
             $TABLE = $this->Model->db_tablename();
             $this->_sqlstmt="INSERT INTO $TABLE($_INTO) VALUES ($_INTOPREPARE) ";
             
@@ -688,24 +727,30 @@ class sql{
             //$TABLE = implode(", ", $this->_DELETE);
             $TABLE = $this->Model->db_tablename();
             
-            if(count($this->_WHERE)>0){
-                $firstkey = NULL;
-                foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
-                if (null === $firstkey) {
-                    $_WHERE="";
-                }else{
-                    $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
-                    $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
-                }
-            }else{
-                $_WHERE ="";
-            }
-            
+            $_WHERE = $this->strWhere();
             $this->_sqlstmt="DELETE FROM $TABLE $_WHERE  ";
             
         }
         return $this->_sqlstmt;
     }
+    
+    private function strWhere(){
+        $_WHERE ="";
+        if(count($this->_WHERE)>0){
+            $firstkey = NULL;
+            foreach ($this->_WHERE as $firstkey => $value) {$value;break;}
+            if (null === $firstkey) {
+                $_WHERE="";
+            }else{
+                $this->_WHERE[$firstkey] = preg_replace('/AND/', ' ', $this->_WHERE[$firstkey], 1);
+                $_WHERE = " WHERE  ".implode(" ", $this->_WHERE);
+            }
+        }else{
+            $_WHERE ="";
+        }
+        return $_WHERE;
+    }
+    
     
     function statement_current(){
         return $this->_sqlstmt;
@@ -1375,9 +1420,9 @@ class model extends modelPublic{
             $this->state("is_selection");
             $sql_read=$this->sql()->statement_read_selection();
             try {
-                $qry = $this->db->query($sql_read);
+                $query = $this->db->execute($sql_read, $this->sql()->values());
                 //echo debug($sql_read);
-                $selection = $qry->fetchAll(\PDO::FETCH_OBJ);
+                $selection = $query->fetchAll(\PDO::FETCH_OBJ);
                 $this->iterator()->Init();
                 $this->OnSelection();
                 foreach ($selection as $instance) {
@@ -1395,7 +1440,7 @@ class model extends modelPublic{
             $this->db_id($id);
             $sql_read=$this->sql()->statement_read_instance();
             //notify($sql_read);
-            $query = $this->db->query($sql_read);
+            $query = $this->db->execute($sql_read, $this->sql()->values());
             if(!$query){
                 $this->state("is_model");
                 echo "<div><h1>ERROR model::read()<h1></div><div>$sql_read</div>";
@@ -1427,13 +1472,13 @@ class model extends modelPublic{
         }else{
             
         }
-        $sql_update=$this->sql()->statement_update();
-        $query = $this->db->query($sql_update);
-        if(!$query){
-            echo debug("$sql_update");
-        }else{
-            $this->OnUpdate();
-        }
+        $sql_update=$this->sql()->update()->where()->statement();
+        $this->db->execute($sql_update,$this->sql()->values());
+        
+        echo debug("$sql_update");
+        
+        
+        $this->OnUpdate();
         $this->properties()->Empty();
         return $this;
     }
@@ -2158,39 +2203,28 @@ class property extends iteratorItem{
         }
     }
     
-    public function caption($set=""){
-        if($set!=""){
-            $this->_caption=$set;
-            return $this;
-        }else{
-          if($this->_caption==""){
-              return str_replace("_"," ",$this->name());
-          }else{
-              return $this->_caption;
-          }
-        }
-    }
-    
-    public function hidden($set=""){
-        if($set!=""){
+    public function hidden($set=3){
+        if($set!=3){
+            if($set ==0){$set="0";}else{$set="1";}
             $this->is_hidden=$set;
             return $this;
         }else{
             return $this->is_hidden;
         }
-        //
     }
-    public function disabled($set=""){
-        if($set!=""){
-            $this->is_disabled=$set;
+    
+    public function disabled($set=3){
+        if($set!=3){
+            if($set ==0){$set="0";}else{$set="1";}
             return $this;
         }else{
             return $this->is_disabled;
         }
     }
-    public function required($set=""){
-        if($set!=""){
-            
+    
+    public function required($set=3){
+        if($set!=3){
+            if($set ==0){$set="0";}else{$set="1";}
             $this->is_required=$set;
             return $this;
         }else{
@@ -2198,8 +2232,21 @@ class property extends iteratorItem{
         }
     }
     
-    public function comment($set=""){
-        if($set!=""){
+    
+    public function caption($set="__NULL__"){
+        if($set!="__NULL__"){
+            $this->_caption=$set;
+            return $this;
+        }else{
+            if($this->_caption==""){
+                return str_replace("_"," ",$this->name());
+            }else{
+                return $this->_caption;
+            }
+        }
+    }
+    public function comment($set="__NULL__"){
+        if($set!="__NULL__"){
             $this->_comment=$set;
             return $this;
         }else{
@@ -2207,8 +2254,8 @@ class property extends iteratorItem{
         }
     }
     
-    public function default($set=""){
-        if($set!=""){
+    public function default($set="__NULL__"){
+        if($set!="__NULL__"){
             $this->_default=$set;
             return $this;
         }else{
@@ -2269,18 +2316,19 @@ class property extends iteratorItem{
     
     
     public function condition() {
-        $value = $this->val();
+        $name= ":where_".$this->name();
         if($this->_operator=="="){
-            $condition = $this->_andor. " " . $this->db_tablename().".". $this->realname()."=\"$value\"";
+            $condition = $this->_andor. " " . $this->db_tablename().".". $this->realname()."= $name";
         }else if($this->_operator=="LIKE"){
             if($this->type()=="checkbox" or $this->type()=="number" or $this->type()=="pk" or $this->type()=="fk"){
-                $condition = $this->_andor. " " .$this->db_tablename().".". $this->realname()."=\"$value\"";
+                $condition = $this->_andor. " " .$this->db_tablename().".". $this->realname()."=$name";
             }else{
-                $condition = $this->_andor. " " . $this->db_tablename().".". $this->realname()." LIKE \"%$value%\"";
+                $condition = $this->_andor. " " . $this->db_tablename().".". $this->realname()." LIKE CONCAT('%', $name, '%')";
             }
         }
         return $condition;
     }
+    
     
     public function and() {
         $this->_andor="AND";
@@ -2290,18 +2338,6 @@ class property extends iteratorItem{
         $this->_andor="OR";
         return $this;
     }
-    
-    /*
-    public function and() {
-        //$list="__AUTO__",$direction="ASC"
-        $this->Model->properties()->find(".".$this->name())->where("AND");
-    }
-    
-    public function or() {
-        //$list="__AUTO__",$direction="ASC"
-        $this->Model->properties()->find(".".$this->name())->where("OR");
-    }
-    */
     
     public function asc() {
         //$list="__AUTO__",$direction="ASC"

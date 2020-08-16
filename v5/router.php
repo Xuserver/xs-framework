@@ -92,9 +92,21 @@ if(count($_POST)>0){
             $a= explode("-", $_POST["model_build"]);
             $obj = Build($a[0]);
             $obj->read($a[1]);
-            //$obj = buildInstance($_POST["model_build"]);
-            //echo "<h1>$method</h1>";            
-            echo $obj->$method();
+            $strpos = strpos($method, "(");
+            if($strpos===false){
+                echo $obj->$method();
+            }else{
+                /*
+                $args=array();
+                if( preg_match( '!\(([^\)]+)\)!', $method, $args ) );
+                $arguments = $args[1];
+                $methodName = substr($method , 0 , $strpos );
+                */
+                
+                eval("echo \$obj->$method;");
+                
+            }
+            
         }
         
         

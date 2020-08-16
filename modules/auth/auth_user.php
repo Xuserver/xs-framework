@@ -11,11 +11,38 @@ class auth_user extends \xuserver\v5\model{
         $this->§password->type("password")->caption("mot de passe")->comment("saisir votre mot de passe")->required(1)->disabled(1);
         $this->§my_photo->type("text")->caption("photo")->comment("choisir votre photo");
         $this->§terms_conditions->comment("accepter les conditions d'utilisation")->required(1);
+        $this->methods()->select(0);
     }
     
     protected function OnInstance(){
+        $session = session();
         $this->properties()->find("email,my_lastname, my_firstname")->select();
+        if($session->exist()){
+            $this->properties()->find("email,my_lastname, my_firstname,#auth_locked,#terms_conditions")->select();
+            $this->§terms_conditions->required(0);
+        }else{
+            $this->properties()->find("email,my_lastname, my_firstname")->select();
+        }
+        
         $this->methods()->select(0)->find("#update,#create")->select(1);
+    }
+    
+    public function lock($opt="0"){
+        $this->properties()->find("name,#auth_locked,#terms_conditions")->select();
+        $this->properties()->find("#terms_conditions")->val($opt)->where();
+        $this->read();
+        $return = $this->ui->table().$this->ui->structure();
+        
+        if($opt=="0"){
+            $this->val(null)->properties()->find("#auth_locked")->val(1)->update();
+            $this->val(null)->properties()->find("#terms_conditions")->val(1)->where();
+            echo notify($opt.$this->sql()->statement());
+        }else{
+            $this->val(null)->properties()->find("#auth_locked")->val($opt)->update();
+            $this->val(null)->properties()->find("#terms_conditions")->val(1)->where();
+            echo notify($opt.$this->sql()->statement());
+        }
+        return $return;
     }
     
     public function form_account(){
