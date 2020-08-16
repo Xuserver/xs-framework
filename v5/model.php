@@ -542,7 +542,7 @@ class sql{
                     if($value=="" or is_null($value) ){
                         
                     }else{
-                        $this->_WHERE[$PROPERTY->name()] = $PROPERTY->pcondition();
+                        $this->_WHERE[$PROPERTY->name()] = $PROPERTY->condition();
                         $self->_VALUES["where_".$PROPERTY->name()]=$value ;
                     }
                 })->Fill();
