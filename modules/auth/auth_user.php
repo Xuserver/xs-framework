@@ -23,12 +23,11 @@ class auth_user extends \xuserver\v5\model{
         }else{
             $this->properties()->find("email,my_lastname, my_firstname")->select();
         }
-        
         $this->methods()->select(0)->find("#update,#create")->select(1);
     }
     
     public function lock($opt="0"){
-        $this->properties()->find("name,#auth_locked,#terms_conditions")->select();
+        $this->properties()->find("#id_user, name,#auth_locked,#terms_conditions")->select();
         $this->properties()->find("#terms_conditions")->val($opt)->where();
         $this->read();
         $return = $this->ui->table().$this->ui->structure();

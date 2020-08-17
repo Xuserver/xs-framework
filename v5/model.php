@@ -66,7 +66,8 @@ class database{
     
     public $pdo;
     public $FK;
-    
+    public $lastInsertId="";
+    public $error;
     public $aKEY = array("ID");
     public $aDATE = array("DATE", "TIMESTAMP");
     public $aXHTML = array("TEXT", "MEDIUMTEXT", "LONGTEXT", "TINYTEXT");
@@ -169,8 +170,10 @@ class database{
         try{
             $return= $this->pdo->query($sql);
         }catch(\Exception $e){
-            echo notify("<div id='model-structure'><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
+            echo notify("<div id='model-structure'><h4>QUERY</h4><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
             $return=false;
+            $this->error = $e;
+            throw $e;
         }
         return $return;
     }
@@ -190,16 +193,18 @@ class database{
                 $return = $statement;
             }catch(\Exception $e){
                 $this->lastInsertId="";
-                echo notify("<div id='model-structure'><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
+                echo notify("<div id='model-structure'><h4>EXECUTE</h4><code>$sql</code><div>".$e->getCode() . $e->getMessage() ."</div></div>" );
                 $this->pdo->rollback();
+                $this->error = $e;
                 $return = false;
             }
         } catch(\Exception $e) {
             $this->pdo->rollback();
             $this->lastInsertId="";
-            echo notify("<div id='model-structure'><code>$sql</code>".$e->getCode() . $e->getMessage() ."</div>" );
-            throw $e;
+            echo notify("<div id='model-structure'><h4>PREPARE</h4><code>$sql</code>".$e->getCode() . $e->getMessage() ."</div>" );
+            $this->error = $e;
             $return = false;
+            throw $e;
         }
         
         return $return;
@@ -1165,7 +1170,6 @@ class modelPublic extends modelProtected{
      * return db id value
      */
     public function db_id($set=""){
-        
         if($set!=""){
             $this->state("is_instance");
             $this->db_id=$set;
@@ -1177,7 +1181,10 @@ class modelPublic extends modelProtected{
     }
     
     
-    
+    /**
+     * @deprecated
+     * @return string
+     */
     public function label(){
         $label="";
         $this->properties()->find("text","type")->each(function(property $prop)use(&$label){
@@ -1415,37 +1422,34 @@ class model extends modelPublic{
             // model built => can load data
         }
         
-        // if $id given => build sql_read and instanciate object
         if ($id=="__NULL__" or $id=="0") {
+            // $id not given => build sql_read and instanciate selection
             $this->state("is_selection");
             $sql_read=$this->sql()->statement_read_selection();
-            try {
-                $query = $this->db->execute($sql_read, $this->sql()->values());
-                //echo debug($sql_read);
-                $selection = $query->fetchAll(\PDO::FETCH_OBJ);
+            $statement = $this->db->execute($sql_read, $this->sql()->values());
+            if($statement===false){
+                $this->state("is_model");
+                echo debug($sql_read);
+            }else{
+                $selection = $statement->fetchAll(\PDO::FETCH_OBJ);
                 $this->iterator()->Init();
                 $this->OnSelection();
                 foreach ($selection as $instance) {
                     $this->iterator()->Attach($instance);
                 }
                 
-            }catch(\PDOException $exception) {
-                $this->state("is_model");
-                echo "<div><h1>ERROR model::read()<h1></div><div>$exception</div>";
-                //echo "<div>SQL $sql_read</div>";
             }            
             
         }else{
-            
+            // $id given => build sql_read and instanciate object
             $this->db_id($id);
             $sql_read=$this->sql()->statement_read_instance();
-            //notify($sql_read);
-            $query = $this->db->execute($sql_read, $this->sql()->values());
-            if(!$query){
+            $statement = $this->db->execute($sql_read, $this->sql()->values());
+            if($statement===false){
                 $this->state("is_model");
-                echo "<div><h1>ERROR model::read()<h1></div><div>$sql_read</div>";
+                echo debug($sql_read);
             }else{
-                $instance = $query->fetchObject();
+                $instance = $statement->fetchObject();
                 $this->val($instance);
                 $this->iterator()->Init();
                 $this->OnInstance();
@@ -1456,8 +1460,7 @@ class model extends modelPublic{
                 });
             }
         }
-        
-        
+
         $this->properties()->Empty();
         return $this;
     }
@@ -1473,14 +1476,22 @@ class model extends modelPublic{
             
         }
         $sql_update=$this->sql()->update()->where()->statement();
-        $this->db->execute($sql_update,$this->sql()->values());
-        
-        echo debug("$sql_update");
-        
-        
-        $this->OnUpdate();
-        $this->properties()->Empty();
-        return $this;
+        $statement = $this->db->execute($sql_update,$this->sql()->values());
+        if( $statement ===false ){
+            
+            if($this->db->error->getCode()==23000){
+                echo notify("<h4>DUPLICATE</h4>".$this->db->error->getMessage());
+            }else{
+                echo notify($this->db->error->getMessage());
+            }
+            
+            $return=$this;
+        }else{
+            $this->OnUpdate();
+            $this->properties()->Empty();
+            $return=$this;
+        }
+        return $return;
     }
     
     /**
@@ -1494,12 +1505,17 @@ class model extends modelPublic{
             
         }
         $sql_insert=$this->sql()->statement_insert();
-        $this->db->execute($sql_insert,$this->sql()->values());
-        $this->OnCreate();
-        $this->properties()->Empty();
-        
-        $return = Build($this->db_tablename());
-        $return->read($this->db->lastInsertId);
+        $statement = $this->db->execute($sql_insert,$this->sql()->values());
+        if( $statement ===false ){
+            echo debug("$sql_insert");
+            $return=$this;
+            
+        }else{
+            $this->OnCreate();
+            $this->properties()->Empty();
+            $return = Build($this->db_tablename());
+            $return->read($this->db->lastInsertId);
+        }
         return $return;
     }
     
@@ -1513,24 +1529,22 @@ class model extends modelPublic{
         }else{
             
         }
-        $return = Build($this->db_tablename());
-        
-        
         $sql_delete=$this->sql()->statement_delete();
-        
-        
-        echo notify($sql_delete);
-        $this->db->execute($sql_delete,$this->sql()->values());
-        $this->OnDelete();
-        $this->properties()->Empty();
-        
-        $return->read();
+        $statement = $this->db->execute($sql_delete,$this->sql()->values());
+
+        if( $statement ===false ){
+            echo debug("$sql_delete");
+            $return=$this;
+        }else{
+            $this->OnDelete();
+            $this->properties()->Empty();
+            $return = Build($this->db_tablename());
+            $return->read();
+        }
         return $return;
     }
 
 }
-
-
 
 
 

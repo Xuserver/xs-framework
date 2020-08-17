@@ -111,7 +111,6 @@ function ajaxResponse(html){
     	var fd = new FormData();
     	fd.append("model_build",$link.attr("href"));
     	fd.append("method",$link.attr("method"));
-		
 		fdPost(fd)
 		e.preventDefault();
 	});
@@ -130,8 +129,6 @@ function ajaxResponse(html){
 					var fd = new FormData();
 					fd.append("model_build",$link.attr("href"));
 					fd.append("method",$link.attr("method"));
-					
-					
 					$table.find("input.xs-action").each(function(e){
 						 if($(this).prop('checked')){
 							 fd.append($(this).attr('name'),$(this).attr('value'))

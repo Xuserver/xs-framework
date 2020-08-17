@@ -55,7 +55,7 @@ if(count($_POST)>0){
             $obj = buildInstance($_POST["model_build"]);
             $obj->val($_POST);
             $obj->update();
-            echo notify("updated");
+            
             echo $obj->ui->form();
             
         }else if($method=="delete"){
