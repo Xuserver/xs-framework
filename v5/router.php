@@ -22,6 +22,7 @@ if(count($_POST)>0){
         $method = $_POST["method"];
         
         
+        //echo notify($method);
         
         if($method=="create"){
             $obj = buildInstance($_POST["model_build"]);

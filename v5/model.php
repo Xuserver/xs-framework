@@ -309,7 +309,7 @@ class sql{
             if($PROPERTY->type()=="fk" ){
                 $sametable=false;
                 if($PROPERTY->fk_tablename()==$PROPERTY->db_tablename()){
-                    // jointure vers la même table
+                    // jointure vers la mï¿½me table
                     $sametable=true;
                     $TABLENAME = $PROPERTY->db_tablename() ; // epc_affaire
                     $FOREIGNKEYNAME = $PROPERTY->name(); // epc_programme
@@ -1015,16 +1015,16 @@ class modelPublic extends modelProtected{
     /**
      * /**
      * overloading function 
-     * § syntax : create o retrieve the property object.
+     * ï¿½ syntax : create o retrieve the property object.
      * otherwise ; set or retrieve the  property value.
      * @param string $name
      * @return \xuserver\v5\property|string
      */ 
     public function __get($name){
         
-        if(strpos($name, "§")===0 ){
+        if(strpos($name, "Â§")===0 ){
             
-            $name = str_replace ( "§", "", $name);
+            $name = str_replace ( "Â§", "", $name);
             $property = $this->_properties->Fetch($name);
             
             if($property==false){
@@ -1345,6 +1345,10 @@ class model extends modelPublic{
         return $this;
     }
     
+    public function buildString($set="__NULL__"){
+        return $this->db_tablename()."-".$this->db_id();
+    }
+    
     
     /**
      * set or retrieve model property values
@@ -1552,6 +1556,7 @@ class iterator{
     private $list=array();
     private $selection=array();
     private $found=array();
+    private $_querystring="";
     protected $Model;
     private $_itemType="FETCH_ITERATORITEM";
     
@@ -1711,19 +1716,19 @@ class iterator{
      * @return \xuserver\v5\properties
      */
     public function find($needle="__ALL__",$by="name",$Empty=true){
+        
         if($needle=="__ALL__"){
-            //$this->selection=$this->list;
             $this->Fill();
         }else if($needle==""){
             
         }else{
             if($Empty){
                 $this->selection=array();
+                $this->_querystring = $needle;
+            }else{
+                $this->_querystring .= ",".$needle;
             }
-            /*
-            $sort = explode(",", str_replace("#","",$needle));
-            $this->sort($sort,"list");
-            */
+            
             $needle = explode(",", $needle);
             foreach ($needle as $value) {
                 foreach ($this->list as &$p){
@@ -1757,6 +1762,47 @@ class iterator{
         
         return $this;
     }
+    
+    function sort($order="__AUTO__",$Context="list"){
+        
+        if( is_string($order)){
+            if($order =="__AUTO__"){
+                $order=array_flip(explode(",", str_replace("#","",$this->_querystring)));
+                
+            }else{
+                $order = explode(",", str_replace("#","",$order));
+            }
+        }
+        
+        
+        if( is_array($order)){
+            
+            $ordered = array();
+            foreach ($order as $key => $val) {
+                
+                
+                if (array_key_exists($key, $this->$Context)) {
+                    
+                    $ordered[$key] = &$this->$Context[$key];
+                    unset($this->$Context[$key]);
+                }
+            }
+            $this->$Context= $ordered + $this->$Context;
+
+            
+        }else if($order!="ksort"){
+            
+        }else{
+            ksort($this->list);
+            ksort($this->selection);
+            ksort($this->found);
+        }
+        
+        
+        return $this;
+    }
+    
+    
     public function then($needle="__ALL__",$by="name"){
         $this->find($needle,$by,false);
         return $this;
@@ -1823,29 +1869,7 @@ class iterator{
     }
     
     
-    function sort($order="",$Context="list"){
-        
-        if( is_array($order)){
-            $ordered = array();
-            $array = &$this->$Context;            
-            foreach ($order as $key => $val) {
-                if (array_key_exists($key, $array)) {
-                    $ordered[$key] = $array[$key];
-                    unset($array[$key]);
-                }
-            }
-            $array= $ordered + $array;
-        }else if($order!="ksort"){
-            
-        }else{
-            ksort($this->list);
-            ksort($this->selection);
-            ksort($this->found);
-        }
-        
-        
-        return $this;
-    }
+    
 }
 
 
@@ -2366,8 +2390,95 @@ class property extends iteratorItem{
 
 class model_ui{
     private $parent="";
+    private $_id="";
+    private $_head="";
+    private $_footer="";
     public function __construct(model &$parent){
         $this->parent=$parent;
+    }
+    
+    public function id($set="__NULL__"){
+       if($set!="__NULL__"){
+            $this->_id=$set;
+            return $this;
+        }else{
+            if($this->_id==""){
+                return $this->id($this->parent->db_tablename() ."-form")->id();
+            }else{
+                return $this->_id;
+            }
+        }
+    }
+    
+    public function buildString($set="__NULL__"){
+        return $this->parent->buildString();
+    }
+    
+    public function head($set="__NULL__",$desc=""){
+        if($set!="__NULL__"){
+            $this->_head="<h3>$set</h3><div class='form-group small'>$desc</div>";
+            return $this;
+        }else{
+            if($this->_head==""){
+                return $this->head($this->parent->db_tablename(),$this->parent->state() . " ".$this->buildString() . " ".date("D/M/Y H:i:s") )->head();
+            }else{
+                return $this->_head;
+            }
+        }
+    }
+    public function footer($set="__NULL__"){
+        if($set!="__NULL__"){
+            $this->_footer="<div class='modal-footer justify-content-between'>$set</div>";
+            return $this;
+        }else{
+            if($this->_footer==""){
+            }else{
+                return $this->_footer;
+            }
+        }
+    }
+    
+    public function form(){
+        $return ="";
+        //$pk=$this->parent->db_index();
+        if($this->parent->properties()->Count("selection")<1){
+            $this->parent->properties()->find("text","type");
+        }
+        
+        $this->parent->properties()->all(function (property $prop) use(&$return){
+            if($prop->is_selected() or $prop->is_primarykey()){
+                $return.=$prop->ui->row();
+            }
+        });
+        ;
+            
+        $methods = "";
+        $cnt=0;
+        $this->parent->methods()->all(function(method $method)use(&$methods, &$cnt){
+            if($method->is_selected()){
+                $name=$method->name();
+                if($cnt==0){$btnprimary="btn-primary";}else{$btnprimary="btn-secondary";}
+                $cnt++;
+                $methods.="<input type='submit' name='form_submit' value = '$name' class='btn $btnprimary' /> ";
+            };
+        });
+            
+            
+        return "
+        <form id=\"".$this->id()."\" method='post' class='shadow p-3 mb-5 bg-white rounded'>
+            <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>
+            ".$this->head()."
+            <div>
+                <input type='hidden' name='model_build' value=\"".$this->buildString()."\" />
+                <input type='hidden' name='method' value='' />
+            </div>".
+            $return.
+            "<div class='form-group'>
+                $methods
+             </div>
+            ".$this->footer()."
+        </form>
+        ";
     }
     
     public function structure(){
@@ -2428,8 +2539,6 @@ class model_ui{
         $return .= "<div id=\"model-structure\"><h1>structure </h1><div class='small'>$date</div><table class='table'>$table</table></div>";
         return $return;
     }
-    
-    
     
     
     public function table(){
@@ -2502,54 +2611,9 @@ class model_ui{
             <table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table></div>";
     }
     
-    private function uiid(){
-        return $this->parent->db_tablename()."-".$this->parent->db_id();
-    }
     
     
-    public function form(){
-        
-        $uiid = $this->uiid();
-        $return ="";
-        //$pk=$this->parent->db_index();
-        if($this->parent->properties()->Count("selection")<1){
-            $this->parent->properties()->find("text","type");
-        }
-        
-        $this->parent->properties()->all(function (property $prop) use(&$return){
-            if($prop->is_selected() or $prop->is_primarykey()){
-                $return.=$prop->ui->row();
-            }
-        });
-        ;
-        
-        $methods = "";
-        
-        $this->parent->methods()->all(function($item)use(&$methods){
-            if($item->is_selected()){
-                $name=$item->name();
-                $methods.="<input type='submit' name='form_submit' value = '$name' /> ";
-            }; 
-        });
-        
-        $date = date("D/M/Y H:i:s");
-        $formid= $this->parent->db_tablename();
-        $state=$this->parent->state();
-        return "<form id=\"$formid-form\" method='post' class='shadow p-3 mb-5 bg-white rounded'>
-            <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>
-            <h3>$formid</h3>
-            <div class='small'>$state $uiid $date</div>
-            <div>
-                <input type='hidden' name='model_build' value='$uiid' />
-                <input type='hidden' name='method' value='' />
-            </div>".
-            $return.
-            "<div>
-                $methods
-             </div>
-             
-            </form>";
-    }
+    
 }
 
 

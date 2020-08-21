@@ -140,7 +140,7 @@ function ajaxResponse(html){
 			});
 		}
 	});
-    
+     
     console.log(".xs-notify")
     $html.find(".xs-notify").each(function() {
         var $notification = $(this);

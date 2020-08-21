@@ -7,10 +7,10 @@ use function xuserver\v5\notify;
 class auth_user extends \xuserver\v5\model{
     
     protected function OnBuild(){
-        $this->§email->type("email")->caption("e-mail")->comment("your email")->required(1);
-        $this->§password->type("password")->caption("mot de passe")->comment("saisir votre mot de passe")->required(1)->disabled(1);
-        $this->§my_photo->type("text")->caption("photo")->comment("choisir votre photo");
-        $this->§terms_conditions->comment("accepter les conditions d'utilisation")->required(1);
+        $this->Â§email->type("email")->caption("e-mail")->comment("your email")->required(1);
+        $this->Â§password->type("password")->caption("mot de passe")->comment("saisir votre mot de passe")->required(1)->disabled(1);
+        $this->Â§my_photo->type("text")->caption("photo")->comment("choisir votre photo");
+        $this->Â§terms_conditions->comment("accepter les conditions d'utilisation")->required(1);
         $this->methods()->select(0);
     }
     
@@ -19,7 +19,7 @@ class auth_user extends \xuserver\v5\model{
         $this->properties()->find("email,my_lastname, my_firstname")->select();
         if($session->exist()){
             $this->properties()->find("email,my_lastname, my_firstname,#auth_locked,#terms_conditions")->select();
-            $this->§terms_conditions->required(0);
+            $this->Â§terms_conditions->required(0);
         }else{
             $this->properties()->find("email,my_lastname, my_firstname")->select();
         }
@@ -59,6 +59,9 @@ class auth_user extends \xuserver\v5\model{
             $session->user($this);
             $this->properties()->find("#email, my_")->select();
             $this->methods()->select("0")->find("form_account,form_profile,logout")->select("1");
+            
+            $this->ui->head("vos coordonnÃ©es","formulaire de contact utilisateur");
+            $this->ui->footer("saisir vos coordonnÃ©es");
             $return .= $this->ui->form();
         }
         $pinsession ="<div id='pinsession'>$session->name</div>";
@@ -81,6 +84,8 @@ class auth_user extends \xuserver\v5\model{
             $session->user($this);
             $this->properties()->find("profile")->select()->disabled("1");
             $this->methods()->select("0")->find("form_profile,form_account")->select("1");
+            $this->ui->head("votre profile","gestion de vos droits d'utilisateur");
+            $this->ui->footer("votre profile");
             $return .= $this->ui->form();
         }
         
@@ -104,7 +109,7 @@ class auth_user extends \xuserver\v5\model{
         $session = session();
         $return = ""; 
         $this->properties()->find("#email, #password")->select()->disabled("0");
-        $this->methods()->select("0")->find("form_signin")->select("1");
+        $this->methods()->select("0")->find("form_signin,form_signup")->select("1");
         
         
         if(!$session->exist()){
@@ -138,6 +143,8 @@ class auth_user extends \xuserver\v5\model{
               }
           }else{
             $return.=notify("Please login");
+            $this->ui->head("connexion","formulaire de login utilisateur");
+            $this->ui->footer("lire les conditions d'utilisation");
             $return .= $this->ui->form();
           }
         }else{
@@ -155,8 +162,8 @@ class auth_user extends \xuserver\v5\model{
     public function form_signup(){
         $session = session();
         $return = ""; 
-        $this->properties()->find("#email, #password, #terms_conditions")->select();
-        $this->methods()->find("#form_signup")->select(1);
+        $this->properties()->find("#password,#email,  #terms_conditions")->select();
+        $this->methods()->select("0")->find("#form_signup,#form_signin")->sort()->select("1");
         if(!$session->exist()){
             if(isset($_POST["password"])){
                 //$this->insert($_POST);
