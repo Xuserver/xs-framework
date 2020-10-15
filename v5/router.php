@@ -1,9 +1,9 @@
 <?php 
 
 include $_SERVER["DOCUMENT_ROOT"]."/xs-framework/v5/config.php";
-use function xuserver\v5\debug;
-use function xuserver\v5\notify;
-use function xuserver\v5\Build;
+//use function xuserver\v5\debug;
+//use function xuserver\v5\notify;
+//use function xuserver\v5\Build;
 
 
 function buildInstance($input){
@@ -17,9 +17,70 @@ function buildInstance($input){
     return $obj;
 }
 
+if(count($_GET)>0){
+    if(isset($_GET["autoComplete"])){
+        header("Content-Type: application/json");
+        $model = $_GET["autoComplete"];
+        $question = $_GET["q"];
+        $results=array();
+        
+        $obj = Build($model);
+        $obj->properties()->find("text","type")->then("pk","type")->val($question)->like()->or();
+        $obj->read()->iterator()->each(function(xuserver\v5\model $item)use(&$results){
+            $text="";
+            $line=array();
+            /*
+             $item->properties()->find("#text","type")->each(function($prop)use(&$text){
+             $val = $prop->val();
+             $text .= " $val |";
+             });
+             */
+            $line["value"]=$item->db_id();
+            $line["text"]=$item->title();
+            $results[]=$line;
+        });
+            $json = json_encode($results);
+            die ($json);
+    }
+    if(isset($_GET["file"])){
+        $url = xs_decrypt($_GET["file"]);
+        $filepath =  $_SERVER['DOCUMENT_ROOT']. '/'.$url;
+        $filename= pathinfo($filepath, PATHINFO_FILENAME );
+        $fileext = pathinfo($filepath, PATHINFO_EXTENSION);
+        
+        if(@is_array(getimagesize($filepath))){ // an image file
+            $img_file = $filepath;
+            $imgData = base64_encode(file_get_contents($img_file));
+            $src = 'data: '.mime_content_type($img_file).';base64,'.$imgData;
+            echo '<img src="'.$src.'" style="width:100%">';
+        } else {
+            
+            $rename= hash("sha256",$filename).".".$fileext;
+            
+            header('Content-Description: File Transfer');
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="'.$rename.'"');
+            header('Expires: 0');
+            header('Cache-Control: must-revalidate');
+            header('Pragma: public');
+            header('Content-Length: ' . filesize($filepath));
+            flush(); // Flush system output buffer
+            readfile($filepath);
+            
+            
+        }
+        die();
+        
+        
+    }
+}
+
+
 if(count($_POST)>0){
-    if(isset($_POST["method"])){
-        $method = $_POST["method"];
+     _DECRYPT_POST();
+    
+    if(isset($_POST["model_method"])){
+        $method = $_POST["model_method"];
         
         
         //echo notify($method);
@@ -57,7 +118,7 @@ if(count($_POST)>0){
             $obj->val($_POST);
             $obj->update();
             
-            echo $obj->ui->form();
+            echo $obj->formular();
             
         }else if($method=="delete"){
             $obj = buildInstance($_POST["model_build"]);
@@ -80,13 +141,13 @@ if(count($_POST)>0){
             $a= explode("-", $_POST["model_build"]);
             $obj = Build($a[0]);
             $obj->read($a[1]);
-                        
+            
             if($obj->state()=="is_instance"){
             }else{
-                $obj=setSearchform($obj);
+                //$obj=setSearchform($obj);
             }
             
-            echo $obj->ui->form();
+            echo $obj->formular();
             
             
         }else{

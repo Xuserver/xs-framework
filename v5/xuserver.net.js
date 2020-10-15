@@ -24,6 +24,27 @@
  */
 
 
+function loadScript(src) {
+	  return new Promise(function (resolve, reject) {
+	    if ($("script[src='" + src + "']").length === 0) {
+	        var script = document.createElement('script');
+	        script.onload = function () {
+	            resolve();
+	        };
+	        script.onerror = function () {
+	            reject();
+	        };
+	        script.src = src;
+	        document.head.appendChild(script);
+	    } else {
+	        resolve();
+	    }
+	});
+}
+
+
+var xsRouter = "/xs-framework/v5/router.php";
+
 
 var $myScreen = "";
 var xsNotifications;
@@ -32,17 +53,19 @@ function xsLayout(){
     $("body").prepend(xsNotifications);
     
 }
+
 $( document ).ready(function() {
 	xsLayout();
-    duplicateIDs($("body"))
-    ajaxResponse($("body"));
 	$myScreen = $("#xs-screen")
 	if($myScreen.length != 1){
 		$myScreen = $("body")
 	}else{
-		
 	}
-		
+	loadScript("https://cdn.jsdelivr.net/gh/xcash/bootstrap-autocomplete@v2.3.7/dist/latest/bootstrap-autocomplete.min.js").then(function(){
+		duplicateIDs($("body"))
+	    ajaxResponse($("body"));
+	});
+	
 });
 
 
@@ -110,11 +133,12 @@ function ajaxResponse(html){
     	var $link = $(this);
     	var fd = new FormData();
     	fd.append("model_build",$link.attr("href"));
-    	fd.append("method",$link.attr("method"));
+    	fd.append("model_method",$link.attr("method"));
 		fdPost(fd)
 		e.preventDefault();
 	});
     
+    console.log("button.close")
     $html.find("button.close").click(function(e) {
     	var $link = $(this);
     	$link.parent().remove()
@@ -128,7 +152,7 @@ function ajaxResponse(html){
 				$link.click(function(e){
 					var fd = new FormData();
 					fd.append("model_build",$link.attr("href"));
-					fd.append("method",$link.attr("method"));
+					fd.append("model_method",$link.attr("method"));
 					$table.find("input.xs-action").each(function(e){
 						 if($(this).prop('checked')){
 							 fd.append($(this).attr('name'),$(this).attr('value'))
@@ -142,10 +166,13 @@ function ajaxResponse(html){
 	});
      
     console.log(".xs-notify")
+    if($html.find(".xs-notify.clear").length != 0 ){
+    	xsNotifications.find(".xs-notify").remove();
+    }
     $html.find(".xs-notify").each(function() {
-        var $notification = $(this);
-        xsNotifications.prepend($notification);
-        setTimeout(function(){ $notification.fadeOut().remove() }, 5000);
+        var $notification = $(this).hide();
+        xsNotifications.prepend($notification.fadeIn());
+        setTimeout(function(){ $notification.fadeOut(400, function(){$notification.remove();}) }, 5000);
     });
     console.log(".xs-debug")
     $html.find(".xs-debug").each(function() {
@@ -155,14 +182,14 @@ function ajaxResponse(html){
     });
     console.groupEnd()
 
-    console.groupCollapsed("dispatch ID")    
+    console.groupCollapsed("dispatch ID")
 	$html.find("form").each(function() {
 		$form = $(this)
 		$ajaxForm($form);
 		$ajaxResponseDispatchNode($form)
 	});
     
-	$html.find("div[id]").each(function() {
+	$html.find("div[id], span[id],a.xs-link[id]").each(function() {
     	var $element = $(this);
         $ajaxResponseDispatchNode($element)
 	});
@@ -189,36 +216,141 @@ function $ajaxForm($form){
 	
 	$form.find("input[type=submit]").click(function(){
 		$button = $(this)
-		$form.find("input[name=method").val($button.attr('value'))
-		$form.xsMethod = $button.attr('value');
-		//$form.submit();
-	})
+		$form.find("input[name=model_method").val($button.attr('method'))
+	});
+	$form.find("input.xs-type-fk").each(function(){
+		var input = $(this).hide();
+		
+		var dual = input.prev();
+		dual.click(function () {
+			var self = $(this);
+			self.select();
+		}).blur(function () {
+			var self = $(this);
+			if(self.val()==""){
+				self.val(self.attr("placeholder"))
+			}
+		});
+		dual.autoComplete({
+			minLength:2,
+			preventEnter:true,
+		    resolverSettings: {
+		        url: xsRouter+"?autoComplete="+input.attr("type"),
+		        fail:function(e){
+		        }
+		    }
+		}).on('autocomplete.select', function (evt, item) {
+			input.val(item.value);
+			dual.attr("placeholder",item.text);
+			dual.val(item.text);
+		}).on('autocomplete.freevalue', function (evt, item) {
+			dual.val(dual.attr("placeholder"))
+		});
+		
+	});
 	
+	$form.find("input.xs-type-file").each(function(){
+		var input = $(this);
+		$ajaxFormFile(input);
+	});
 	
 	$form.submit(function(e){
-		 //var $form = $(this);
-		 
 		 var fd = new FormData(this);
          $form.find('input[type="checkbox"]').each(function(e){
 			 if(! $(this).prop('checked')){
 				 fd.append($(this).attr('name'),"0")
 			 }
 		 });
-		 fdPost(fd)
-		 
-		e.preventDefault();
+		 fdPost(fd);
+		 e.preventDefault();
 	 });
 }
+
+
+function $ajaxFormFile(input) {
+	
+	var btnSelectFile =  $("<input type='button' class='btn btn-primary xs-fn-filedropper' value='Select file' /> ").click(function(){
+		var me = $(this);
+		input.click()
+	});
+	
+	var helper = $("<span class='col-sm-12 form-text text-muted small fileHelper'>choose file ...</span>")
+	var thumb = input.prev();
+	
+	input.change(function(){
+		var me = $(this);
+		helper.html(me[0].value.split("\\").pop())
+	});
+	function randomtag() {
+	    return Math.round(+new Date() / 1000);
+	}
+	var btnViewFile =  $("<input type='button' class='btn btn-outline-primary' value='open' />").click(function(){
+		var me = $(this);
+		var body = $("body");
+		var frame = $ ("<div><iframe src='"+xsRouter+"?file="+input.attr("title")+"' style='border:0;width:100%;min-height:80vh;'/></div>").appendTo(body)
+		var bs = bsModal(frame);
+		bs.dialog.addClass("mw-100 w-75");
+	});
+	
+	if(input.attr("title")!=""){
+		input.hide().parent().append(btnSelectFile, btnViewFile,thumb).append(helper)
+		//helper.html(input.attr("title").split("/").pop());
+		helper.html("drag new file or click view button to open existing file ")
+	}else{
+		input.hide().parent().append(btnSelectFile, btnViewFile.attr("disabled","disabled").addClass("disabled"),thumb ).append(helper)
+	}
+	var xhr = new XMLHttpRequest();
+	if (xhr.upload) {
+		var filedrag = btnSelectFile;
+		$("html").on("dragover", function(e) {
+            e.preventDefault(); e.stopPropagation();
+            filedrag.removeClass('btn-primary').addClass('btn-success');
+            btnSelectFile.val("Drag here");
+        });
+		$("html").on("drop", function(e) {
+			e.preventDefault(); e.stopPropagation();
+			$("input.xs-fn-filedropper").val("Select file").removeClass('btn-success').addClass('btn-primary');
+			
+		});
+		
+	    // Drag over
+		filedrag.on('dragover', function (e) {
+	        e.stopPropagation(); e.preventDefault();
+	        filedrag.removeClass('btn-success').addClass('btn-warning');
+	        btnSelectFile.val("Drop here");
+	    });
+		filedrag.bind('dragleave', function(e){
+			e.stopPropagation();
+	        e.preventDefault();
+	        filedrag.removeClass('btn-warning').addClass('btn-success');
+		});
+		// Drop
+		filedrag.on('drop', function(e) {
+			e.stopPropagation(); e.preventDefault();
+			$("input.xs-fn-filedropper").val("select file").removeClass('btn-warning').removeClass('btn-success').addClass('btn-primary');
+			//btnSelectFile.val("Dropped");
+			var file = e.originalEvent.dataTransfer.files;
+			input.prop('files', e.originalEvent.dataTransfer.files);
+			input.change();
+			
+		});
+	
+	}
+}
+
 
 
 function fdPost(fd){
 	$.ajax({
 		 type: "post",
 		 data: fd,
-		 url: "/xs-framework/v5/router.php",
+		 url: xsRouter,
 		 processData: false,
 		 contentType: false,
 		 cache: false,
+		 beforeSend: function() {
+			 //for (var value of fd.values()) {console.log(value);}
+		 },
 		 success: function(data) {
 			 ajaxResponse(data);
 		 },
@@ -231,6 +363,7 @@ function $ajaxResponseDispatchNode(element){
 	var $body=$("body");
 	var selector = element.prop("tagName")+"[id='"+element.attr("id")+"']";
 	if(element.attr("id")==""){
+		console.log("empty id "+element.prop("tagName")+"#"+ element.attr("id"))
         return false;
 	}else{
 		
@@ -239,17 +372,50 @@ function $ajaxResponseDispatchNode(element){
     		return false;
     	}
     	if(existing.length != 0 ){
-    		console.log("#"+ element.attr("id"))
+    		console.log("replace "+element.prop("tagName")+"#"+ element.attr("id"))
     		existing.replaceWith(element);
             return true;
     	}else{
-    		console.warn("#"+ element.attr("id"))
+    		console.log("append "+element.prop("tagName")+"#"+ element.attr("id"))
     		$myScreen.append(element)
+    		//bsModal(element)
     		return false;
     	}
 	}
 }
 
 
+var bsZindex=1040;
+function bsModal(content, options) {
+    var defaults = {
+        title: "dialog modal box",
+        size:"modal-lg",
+        print:false,
+        animation:"fade"
+    }
+    var content = $(content)
+    options = jQuery.extend(defaults, options);
+  	var bs = $('<div class="modal '+options.animation+' bsModal " id="basicModal" tabindex="-1" role="dialog" aria-labelledby="basicModal" aria-hidden="true" />');
+    bs.dialog=$("<div class='modal-dialog "+options.size+"  ' />")
+  	bs.container = $('<div class="modal-content container">');
+  	bs.body = $('<div class="modal-body">').html(content);
+  	
+  	bs.dialog.append(bs.container);
+  	bs.container.append(bs.body);
+  	bs.append(bs.dialog);
+  	$("body").prepend(bs);
+  	
+  	bs.modal('show');
+    bsZindex++;
+    bs.css("z-index", bsZindex);
+    /*
+    bs.on('hidden.bs.modal', function (e) {
+    	console.log("remove modal");
+    	$(this).data('bs.modal', null).remove();
+    	
+    })
+    */
+    return bs;
+}
 
 
