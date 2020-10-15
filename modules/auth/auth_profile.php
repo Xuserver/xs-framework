@@ -82,7 +82,7 @@ class auth_profile extends \xuserver\v5\model{
                     $try = $permission->permModule;
                     if( isset($authorizations[$try]) ){// le profile ne possède pas d'autorisation pour le privilege de la Table, mais il en possède une pour le Module
                         $permission->__CRUD($authorizations[$try]["crud"]);
-                        echo notify("$key pas d'autorisation sur le module" );
+                        
                     }else{
                         
                     }
