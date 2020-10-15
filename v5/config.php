@@ -7,7 +7,6 @@
  * _config
  **********************************************************************************************************/
 
- 
 // github.com template
  define('XUSERVER_DB_SERVER',"");   // Database server internet address
  define('XUSERVER_DB_NAME',"");     // Database name
@@ -18,7 +17,9 @@
  define('XUSERVER_ADMIN_ID',""); // admin profile key !IMPORTANT
  
  define('XUSERVER_POST_IGNORE', "POST_IGNORE@"); // prefix to ignored inputs _POST
-
+ 
+  
+/**/
 
 
 
