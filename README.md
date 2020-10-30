@@ -28,7 +28,7 @@ ORM: Coté serveur, la syntaxe des méthodes publiques de vos classes bénéfici
 - du mapping objet-relationnel de la base de données relationnelle (MySQL).
 - de méthodes chainables pour l'affichage des formulairs, des collections d'objets ... 
 
-GED: Il est completé par une interface client jQuery / Bootstrap donnant plus de relief à vos applications web collaboratives et intégrant une gestion de fichiers de type GED.
+GED: Il est completé par une interface client jQuery / Bootstrap donnant plus de relief à vos applications web collaboratives et intégre des fonctionnalté GED.
 
 # Modules 
 les modules existants 
@@ -36,4 +36,4 @@ les modules existants
 - gestion de projet construction (en cours)
 
 visit
-http://xuserver.net/xs-demo/ 
+http://xuserver.net/xs-framework/documentation.php 
