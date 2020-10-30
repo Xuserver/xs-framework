@@ -75,7 +75,7 @@ function debug($s,$echo=false){
  */
 function notify($s,$class="warning"){
     $id="xs-info-".rand();
-    $alert = "<div id='$id' class='xs-notify  alert alert-$class'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button><h6>notification</h6> $s </div>";
+    $alert = "<div id='$id' class='xs-notify  alert alert-$class' style='display:none; user-select: none; cursor:pointer;'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button><h6>notification</h6> $s </div>";
     return $alert;
 }
 
@@ -128,7 +128,12 @@ function _DECRYPT_FILE(){
  * @return string
  */
 function xs_encrypt($input){
-    return $input;
+    /*
+    $session = session();
+    if($session->admin()){
+        return $input;
+    }
+    */
     return openssl_encrypt($input, "AES-128-ECB" ,XUSERVER_ENCRYPT);
 }
 /**
@@ -137,20 +142,49 @@ function xs_encrypt($input){
  * @return string
  */
 function xs_decrypt($input){
-    return $input;
+    /*
+    $session = session();
+    if($session->admin()){
+        return $input;
+    }
+    */
     return openssl_decrypt($input, "AES-128-ECB" ,XUSERVER_ENCRYPT);
 }
 
 
-function xs_link($uid,$href,$method,$caption,$bsclass,$title){
+function xs_link($uid,$href,$method,$caption,$bsclass="",$title=""){
+    $href=xs_encrypt($href);
+
     if($uid!=""){
         $attrID = "id=\"$uid\"";
     }else{
         $attrID = "";
     }
-    
-    return "<a $attrID href=\"$href\" method=\"$method\" class=\"xs-link btn $bsclass\" title=\"$title\" >$caption</a> ";
+    if($bsclass!=""){
+        if(strpos($bsclass, "btn")===0){
+            $bsclass = "btn $bsclass";
+        }
+        
+        
+    }
+    return "<a $attrID href=\"$href\" method=\"$method\" class=\"xs-link $bsclass\" title=\"$title\" >$caption</a> ";
 }
+
+/*
+function getDocumentation($inspectclass) {
+    $methods = get_class_methods($inspectclass);
+    $class =get_class($inspectclass);
+    $arr = [];
+    foreach($methods as $method) {
+        $ref=new ReflectionMethod( $class, $method);
+        if($ref->isPublic()) {
+            $arr[$method] = $ref->getDocComment();
+        }
+    }
+    return dump($arr);
+}
+*/
+
 
 
 ?>

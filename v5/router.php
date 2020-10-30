@@ -1,22 +1,18 @@
 <?php 
 
 include $_SERVER["DOCUMENT_ROOT"]."/xs-framework/v5/config.php";
-//use function xuserver\v5\debug;
-//use function xuserver\v5\notify;
-//use function xuserver\v5\Build;
+//use xuserver\v5\model;
 
 
-function buildInstance($input){
-    $a= explode("-", $input);
-    $db_tablename = $a[0];
-    $db_id = $a[1];
-    $obj = Build($db_tablename);
-    $obj->read($db_id);
-    $find = implode(",#", array_keys($_POST));
-    $obj->properties()->find("#$find")->select()->sort($_POST);
-    return $obj;
-}
+/************************************************************************************
+                                GETTING SESSION 
+ ************************************************************************************/
+$session = session();
 
+
+/************************************************************************************ 
+                                GET ACTIONS 
+************************************************************************************/
 if(count($_GET)>0){
     if(isset($_GET["autoComplete"])){
         header("Content-Type: application/json");
@@ -27,9 +23,10 @@ if(count($_GET)>0){
         $obj = Build($model);
         $obj->properties()->find("text","type")->then("pk","type")->val($question)->like()->or();
         $obj->read()->iterator()->each(function(xuserver\v5\model $item)use(&$results){
-            $text="";
+            
             $line=array();
             /*
+             $text="";
              $item->properties()->find("#text","type")->each(function($prop)use(&$text){
              $val = $prop->val();
              $text .= " $val |";
@@ -54,9 +51,7 @@ if(count($_GET)>0){
             $src = 'data: '.mime_content_type($img_file).';base64,'.$imgData;
             echo '<img src="'.$src.'" style="width:100%">';
         } else {
-            
             $rename= hash("sha256",$filename).".".$fileext;
-            
             header('Content-Description: File Transfer');
             header('Content-Type: application/octet-stream');
             header('Content-Disposition: attachment; filename="'.$rename.'"');
@@ -66,118 +61,170 @@ if(count($_GET)>0){
             header('Content-Length: ' . filesize($filepath));
             flush(); // Flush system output buffer
             readfile($filepath);
-            
-            
         }
         die();
-        
-        
     }
 }
 
 
+
+/************************************************************************************ 
+                                POST ACTIONS 
+************************************************************************************/
+
 if(count($_POST)>0){
-     _DECRYPT_POST();
+    _DECRYPT_POST();
     
     if(isset($_POST["model_method"])){
+        $obj = buildInstance($_POST["model_build"]);
         $method = $_POST["model_method"];
+                
+        // auth preparation
         
+        $strpos = strpos($method, "(");
         
-        //echo notify($method);
+        if($strpos===false){ // method name only
+            $arguments="";
+            $methodName = $method;
+            $methodEval="$method()";
+            //$method = $method;
+             
+        }else{ // method with parenthesis and optinal arguments
+            $args=array();
+            if( preg_match( '!\(([^\)]+)\)!', $method, $args ) );
+            $arguments = $args[1];
+            $methodName = substr($method , 0 , $strpos );
+            $methodEval=$method;
+            $method= $methodName;
+        }
+        $KeyTable = $obj->__module()."-".$obj->db_tablename();
+        $KeyMethod = $obj->__module()."-".$obj->db_tablename()."-$methodName";
+        $test = $session->can($KeyMethod);
+        
+        if($test){
+            echo notify("$KeyMethod($arguments) $test","success");
+        }else{
+            echo notify("$KeyMethod($arguments) $test","danger");
+        }
         
         if($method=="create"){
-            $obj = buildInstance($_POST["model_build"]);
+        
             if($obj->state()=="is_selection"){
-                $obj->db_id("-1");
-                echo $obj->ui->form();
+                if(count($_POST)<=2){
+                    echo notify("please fill in form");
+                    $obj->db_id("0");
+                    $obj->title("new ...");
+                    $obj->methods()->select(0)->find("#create")->caption("create")->select(1)->bsclass("btn-outline-primary");
+                    echo $obj->formular("create");
+                }else{
+                    $obj->val($_POST);
+                    $new = $obj->create();
+                    $blank = Build($new->db_tablename())->read();
+                    $obj->db_id("0");
+                    $obj->title("new ...");
+                    $obj->val(null);
+                    $obj->methods()->select(0)->find("#create")->caption("create")->select(1)->bsclass("btn-outline-primary");
+                    echo notify("ok, please fill in form");
+                    echo $blank->ui->table().$obj->formular("create");
+                }
+                
             }else{
-                $obj->val($_POST);
+                $obj->val(null);
                 $new = $obj->create();
                 $blank = Build($new->db_tablename())->read();
+                //$new->title("give a title");
                 echo notify("created");
-                echo $blank->ui->table().$new->ui->form();
+                echo $blank->ui->table().$new->formular();
             }
             
             
         }else if($method=="read"){
-            $a= explode("-", $_POST["model_build"]);
-            $obj = Build($a[0]);
-            unset($_POST[$obj->db_index()]);
-            $obj->val($_POST);
-            $obj=setSearchform($obj);
-            $form = $obj->ui->form();
+            //$a= explode("-", $_POST["model_build"]);
+            //$obj = Build($a[0]);
             
-            $obj->properties()->find()->like()->where();
+            $form="";
+            $obj->properties()->find()->select()->like()->where();
             $obj->read();
             $table = $obj->ui->table();
-            echo debug($obj->sql()->statement_current());
             echo $form.$table;
             
         }else if($method=="update"){
-            $obj = buildInstance($_POST["model_build"]);
+            //$obj = buildInstance($_POST["model_build"]);
             $obj->val($_POST);
             $obj->update();
             
             echo $obj->formular();
             
         }else if($method=="delete"){
-            $obj = buildInstance($_POST["model_build"]);
+            //$obj = buildInstance($_POST["model_build"]);
+            
             if($obj->state()=="is_selection"){
                 if(isset($_POST["ids"])){
                     $empty = $obj->db_id($_POST["ids"])->delete();
+                    echo $obj->ui->killForm();
                     echo $empty->ui->table();
                 }else{
-                    
                 }
-                
             }else{
-                //$empty = $obj->delete();
-                echo $empty->ui->table();
+                $empty = $obj->delete();
+                echo $obj->ui->killForm();
+                echo $obj->ui->killList();
+                echo $obj->ui->killTr();
             }
             
-            
-            
         }else if($method=="form"){
-            $a= explode("-", $_POST["model_build"]);
-            $obj = Build($a[0]);
-            $obj->read($a[1]);
+            //$a= explode("-", $_POST["model_build"]);
+            //$obj = Build($a[0]);
+            //$obj->read($a[1]);
             
             if($obj->state()=="is_instance"){
             }else{
                 //$obj=setSearchform($obj);
             }
-            
             echo $obj->formular();
-            
             
         }else{
             $a= explode("-", $_POST["model_build"]);
             $obj = Build($a[0]);
             $obj->read($a[1]);
-            $strpos = strpos($method, "(");
-            if($strpos===false){
-                echo $obj->$method();
+            
+            if($session->can($KeyMethod)){
+                eval("echo \$obj->$methodEval;");
             }else{
-                /*
-                $args=array();
-                if( preg_match( '!\(([^\)]+)\)!', $method, $args ) );
-                $arguments = $args[1];
-                $methodName = substr($method , 0 , $strpos );
-                */
-                
-                eval("echo \$obj->$method;");
-                
+                eval("echo \$obj->$methodEval;");
             }
+
             
         }
-        
-        
-        //
-        
     }
 }
 
 
+
+/************************************************************************************
+                        COMMON ROUTER FUNCTIONS
+ ************************************************************************************/
+
+function buildInstance($input){
+    $a= explode("-", $input);
+    $db_tablename = $a[0];
+    if(!isset($a[1])){
+        $a[1]=0;
+    }
+    
+    $db_id = $a[1];
+    $obj = Build($db_tablename);
+    $obj->read($db_id);
+    $find = implode(",#", array_keys($_POST));
+    $obj->properties()->find("#$find")->select()->sort($_POST);
+    return $obj;
+}
+
+/**
+ * @deprecated
+ * @param model $obj
+ * @return unknown
+ 
 function setSearchform($obj){
   $obj->properties()->find("#text, #textarea","type")->val(null);
   $obj->properties()->find("#checkbox","type")->type("radio");
@@ -187,6 +234,6 @@ function setSearchform($obj){
   
   return $obj;
 }
-
+*/
 
 ?>

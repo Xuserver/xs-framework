@@ -3,30 +3,52 @@
 namespace xuserver\v5;
 
 use PDO;
+use xuserver;
 
 /**
- * database encapsulation class 
- * analyse relationships between tables reading mysql or postgree  INFORMATION_SCHEMA
- * @todo extend PDO
- * @author gael jaunin
+ * DATABASE ENCAPSULATION CLASS
+ *  
+ * Analyse Relationships between tables reading mySql or postgree INFORMATION_SCHEMA
+ * 
+ * Database Object is accessible in model class using public getter db() : 
+ * $Model->db(); 
  *
  */
 class database{
-    
+    /**  Primary key DB Field Types **/
     private $aKEY = array("ID");
+    /**  Date DB Field Types **/
     private $aDATE = array("DATE", "TIMESTAMP");
+    /**  HTML DB Field Types **/    
     private $aXHTML = array("TEXT", "MEDIUMTEXT", "LONGTEXT", "TINYTEXT");
+    /**  BLOB DB Field Types **/
     private $aBLOB = array("BLOB", "MEDIUMBLOB", "LONGBLOB");
+    /**  CAMERA DB Field Types @deprecated **/
     private $aCAMERA = array("TINYTEXT");
+    /**  NUMERIC DB Field Types **/
     private $aNUMBER = array("NUMERIC", "DECIMAL", "FLOAT", "DOUBLE", "SMALLINT");
+    /**  BOOLEAN DB Field Types **/
     private $aBOOL = array("TINYINT");
+    /**  TEXT DB Field Types **/
     private $aTEXT = array("VARCHAR", "MEDIUMINT");
+    /**  OBJECT DB Field Types @deprecated **/
     private $aOBJ = array("INTEGER", "INT", "BIGINT");
+    /**  LIST DB Field Types **/
     private $aENUM = array("ENUM");
     
+    /**
+     * PDO Object
+     * @see config.php
+     * 
+     */
     public $pdo;
     
+    /**
+     * public Array of Database foreign keys
+     *
+     */
     public $FK;
+    /*
     public function FK($key="__NULL__"){
         if($key!="__NULL__"){
             if(! $this->isFK($key)){
@@ -39,6 +61,7 @@ class database{
             return $this->FK;
         }
     }
+    
     public function isFK($key){
         if (isset($this->db->FK[$key])) {
             return true;
@@ -46,9 +69,10 @@ class database{
             return false;
         }
     }
-    
+    */
     
     public $lastInsertId="";
+    
     
     private $db_error;
     function db_error($set="__NULL__"){
@@ -63,21 +87,31 @@ class database{
     
     
     public function __construct(\PDO $pdo=null) {
-        $this->pdo=$pdo;
-        $this->loadForeignKeys();
+        if(is_null($pdo)){
+            
+        }else{
+            $this->pdo=$pdo;
+            $this->loadForeignKeys();                
+        }        
+        
     }
     
     
         
 
     /**
-     * read database and fill relatioships array
+     * read Database and fill Relatioships array
      * @return array
      */
-    public function loadForeignKeys(){
+    private function loadForeignKeys(){
         $sqlForeigkeys = "SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE REFERENCED_TABLE_SCHEMA = '".XUSERVER_DB_NAME."'  ";
         $queryDescribe = $this->query($sqlForeigkeys);
         $this->FK = array();
+        
+        if($queryDescribe === false){
+            return $this->FK;
+        };
+        
         foreach ($queryDescribe as $row) {
             $this->FK[$row["TABLE_NAME"]."_".$row["COLUMN_NAME"]]=array("table"=>$row["TABLE_NAME"],"index"=>$row["COLUMN_NAME"] ,"db_tablename" => $row["REFERENCED_TABLE_NAME"], "db_index"=>$row["REFERENCED_COLUMN_NAME"]);
         }
@@ -86,7 +120,7 @@ class database{
     
     
     /**
-     * determine the default html input type  for a given property
+     * set the default html input type  for a given property
      * @param property $property
      * @param string $db_type
      */
@@ -148,11 +182,14 @@ class database{
     
     /**
      * overrides pdo query method
-     * @param string $stmt
-     * @param string $stmt
+     * @param string $sql
      * @return \PDO 
      */
-    public function query(string $sql){ 
+    public function query(string $sql=null){
+        
+        if(is_null($sql)){
+            return false;
+        }
         try{
             $return= $this->pdo->query($sql);
         }catch(\Exception $e){
@@ -164,9 +201,7 @@ class database{
         return $return;
     }
     
-    /**
-     * 
-     */
+    
     public function execute($sql,$data=""){
         $this->lastInsertId="";
         try {
@@ -254,7 +289,12 @@ class sql{
     // DELETE
     private $_DELETE;
     
-    public function __construct(model&$model) {
+    public function __construct(model &$model =null) {
+        if (is_null($model)){
+            //var_dump($this);
+            return false;
+        }
+        
         $this->Model=$model;
         $this->reset();
     }
@@ -542,6 +582,7 @@ class sql{
         if($list=="__AUTO__"){
             $this->_WHERE=array();
             
+            // passage d'un tableau = instance ??
             if($case =="is_instance"){
                 
                 if(is_array($this->Model->db_id())){
@@ -867,9 +908,11 @@ class iterator{
     protected $Model;
     private $_itemType="FETCH_ITERATORITEM";
     
-    public function __construct(model &$model){
-        $this->Model=$model;
-        
+    public function __construct(model &$model =null){
+        if($model==null){
+        }else{
+            $this->Model=$model;
+        }
     }
     
     
@@ -1186,11 +1229,23 @@ class iterator{
 
 }
 
+/**
+ * standard item in iterator
+ * 
+ * 
+ */
 class iteratorItem{
     private $Model; // point to the model
     protected $_type="";
     protected $_name="";
     protected $_value="";
+    
+    /**
+     * Set or Retrieve the item type
+     *  
+     * @param string $set
+     * @return \xuserver\v5\iteratorItem|string
+     */
     public function type($set="__NULL__"){
         if($set!="__NULL__"){
             $this->_type=$set;
@@ -1234,69 +1289,26 @@ class iteratorItem{
 
 
 
-/**
- * ORM Model class
- *
- * @author gael jaunin
- *
- */
-class modelPrivate extends iteratorItem{
-    
-}
-
-/**
- * ORM Model class
- *
- * @author gael jaunin
- *
- */
-class modelProtected extends modelPrivate{
-    protected function OnBuild() {
-        
-    }
-    
-    
-    protected function OnFormular($type) {
-        
-    }
-    
-    protected function OnSelection() {
-        
-    }
-    
-    protected function OnInstance() {
-        
-    }
-    
-    protected function OnUpdate() {
-        
-    }
-    
-    protected function OnCreate() {
-        
-    }
-    
-    protected function OnDelete() {
-        
-    }
-    
-}
 
 
 /**
- * ORM Model class
+ * ORM MODEL STRUCTURE CLASS 
  *
- * @author gael jaunin
- *
+ * The modelStructure class is an iteratorItem child that olds Methods :
+ * - to launch PHP overloading Functions over a model (set, get, call, invoke)
+ * - to access and traverse Model structure (properties, methods, relations, iterator (to be renamed))
+ * - to access database and sql classes 
+ * - to describe the Model : __module()
+ * 
  */
-class modelPublic extends modelProtected{
+class modelStructure extends iteratorItem{
     private $__debug="";
     /**
      * sql class attached to the model
      * @todo rename to private var
      * @var sql
      */
-    public $sql;
+    private $sql;
     /**
      * user interface attached to the model
      * @var model_ui
@@ -1315,8 +1327,9 @@ class modelPublic extends modelProtected{
      * PDO attached to the model
      * @todo remove, using only db object
      * @var PDO
+     * @deprecated
+     * protected $pdo;
      */
-    protected $pdo;
     
     /**
      * database class attached to the model
@@ -1380,7 +1393,7 @@ class modelPublic extends modelProtected{
     public function __construct(database $db=null) {
         if(is_null($db)){
             global $XUSERVER_DB;
-            $this->pdo = &$XUSERVER_DB->pdo;
+            //$this->pdo = &$XUSERVER_DB->pdo;
             $this->db = &$XUSERVER_DB;
         }else{
             $this->db = $db;
@@ -1464,14 +1477,14 @@ class modelPublic extends modelProtected{
             }else{
                 return $method;
             }
-            
         }
-        
+
+        echo notify("OVERLOADING RELATIONS SYNTAX __CALL <br/> ".$this->db_tablename()."->$name() ","danger" );        
         if(strpos($name, "_")===0 ){ // relation
             $name = substr($name,1);
             $relation = $this->_relations->Fetch($name);
             if($relation==false){
-                echo notify("qszidqaidjaz $name");
+                
                 return $this->_relations;
             }else{
                 return $relation;
@@ -1489,32 +1502,36 @@ class modelPublic extends modelProtected{
     }
     
     /**
-     * @deprecated
-     * @param string $m
-     * @return \xuserver\v5\modelPublic|string
+     * Pseudo namespace the Model belongs to
+     * 
      */
-    function debug($m=""){
-        if( is_null($m) ){
-            $this->__debug = "";
-            return $this;
-        }else if($m==""){
-            return $this->__debug;
-        }else{
-            $this->__debug .= debug($m);
-            return $this;
-        }
-    }
-    
-    public function _module(){
+    private $_module="__EMPTY__";
+    /**
+     * Return the name of the module the model (or its descendant) belongs to
+     * Module name is defined parsing namespaces of descendant class 
+     * @return string
+     */
+    public function __module(){
+        /*
         $class= get_class($this);
         $arr=explode("\\", $class);
         return $arr[count($arr)-2];
+        
+        */
+        if($this->_module=="__EMPTY__"){
+          $class= get_class($this);
+          $arr=explode("\\", $class);
+          $this->_module = $arr[count($arr)-2];
+        }else{
+            
+        }
+        return $this->_module;
     }
     
     /**
-     * init model, reseting all its internal properties
+     * Init model interface, reseting its modelStructure properties
      */
-    public function Init(){
+    public function __reset(){
         $this->db_tablename="";
         $this->db_index="";
         $this->db_id=0;
@@ -1531,13 +1548,134 @@ class modelPublic extends modelProtected{
     
     
     
+    /**
+     * Traversing modelStructure 
+     * Return the iterator object that stores the list of instances
+     *  
+     * @see \xuserver\v5\model 
+     * @return \xuserver\v5\iterator
+     */
+    public function iterator(){
+        return $this->_iterator;
+    }
     
+    /**
+     * Traversing modelStructure 
+     * Return the iterator object that stores the list of property
+     *
+     * @see \xuserver\v5\property 
+     * @return \xuserver\v5\properties
+     */
+    public function properties(){
+        //$this->_properties->Empty();
+        return $this->_properties;
+    }
+    /**
+     * Traversing modelStructure 
+     * Return the iterator object that stores the list of relation
+     * 
+     * @see \xuserver\v5\relation
+     * @return \xuserver\v5\relations
+     */
+    public function relations(){
+        return $this->_relations;
+    }
     
+    /**
+     * Traversing modelStructure
+     * Return the iterator object that stores the list of method
+     * 
+     * @see \xuserver\v5\method
+     * @return \xuserver\v5\methods
+     */
+    public function methods(){
+        return $this->_methods;
+    }
     
+       
+    /**
+     * Traversing modelStructure
+     * 
+     * Return the sql ORM driver
+     * @return \xuserver\v5\sql
+     */
+    public function sql(){
+        return $this->sql;
+    }
+    
+    /**
+     * Traversing model structure 
+     * Return the database object on which PDO queries are executed
+     * 
+     * @return \xuserver\v5\database
+     */
+    public function db(){
+        return $this->db;
+    }
+    
+    /**
+     * 
+     * Return the name of the database table that stores the model
+     * @return string
+     */
+    public function db_tablename(){
+        return $this->db_tablename;
+    }
     
     
     /**
+     * Return the name of the database field that stores the model primary key
+     * @return string
+     */
+    public function db_index(){
+        return $this->db_index;
+    }
+    
+    
+    /**
+     * Set or Retrieve the value model primary key in database
+     * @param string $set 
+     * value can be either an integer or an array of integers  
+     * @return \xuserver\v5\modelStructure|string
+     */
+    public function db_id($set="__NULL__"){
+        if($set!="__NULL__"){
+            if( is_null($set) or $set =="0"  or $set ===0 ){
+                $this->state("is_selection");                            
+            }else{
+                // array = instance ??
+                $this->state("is_instance");
+            }
+            $this->db_id=$set;
+            return $this;
+        }else{
+            return $this->db_id;
+        }
+    }
+    
+    /**
+     * Return model a string that references the model instance 
+     * 
+     * USAGE
+     * $customer->href(); 
+     * // return 'customer-1'
+     * 
+     * EXAMPLES
+     * #Model_href
+     * 
+     * @see router.php
+     * @see \xs_encrypt()
+     * @see \xs_link()
+     * @return string
+     */
+    public function href(){
+        return ($this->db_tablename()."-".$this->db_id()) ;
+    }
+    
+    /**
      * set model current _state
+     * model state can be virgin, instance, selection 
+     * 
      * @param string $set
      * @return \xuserver\v5\model|string
      */
@@ -1550,88 +1688,159 @@ class modelPublic extends modelProtected{
         }
     }
     
-    /**
-     *
-     * @return \xuserver\v5\sql
-     */
-    public function sql(){
-        return $this->sql;
-    }
+}
+
+
+
+/**
+ * ORM Model Event class
+ * 
+ * Events are fired on model public method execution : 
+ * - create()
+ * - read()
+ * - update()
+ * - delete()
+ * 
+ * They can be overwritten in descendant class files. 
+ *
+ *
+ */
+class modelEvents extends modelStructure{
     
     /**
-     *
-     * @return \xuserver\v5\iterator
+     * This Event is  fired when model is Built
+     * Use it to assign properties types, requided, comments and so on
+     * 
+     * @see model::build()
      */
-    public function iterator(){
-        return $this->_iterator;
-    }
-    
-    /**
-     *
-     * @return \xuserver\v5\properties
-     */
-    public function properties(){
-        //$this->_properties->Empty();
-        return $this->_properties;
-    }
-    /**
-     *
-     * @return \xuserver\v5\relations
-     */
-    public function relations(){
-        return $this->_relations;
-    }
-    /**
-     *
-     * @return \xuserver\v5\methods
-     */
-    public function methods(){
-        return $this->_methods;
-    }
-    /**
-     *
-     * @return \xuserver\v5\database
-     */
-    public function db(){
-        return $this->db;
-    }
-    /**
-     *
-     * @return string|mixed
-     */
-    public function db_tablename(){
-        return $this->db_tablename;
-    }
-    
-    public function db_index(){
-        return $this->db_index;
-    }
-    /**
-     * return db id value
-     */
-    public function db_id($set=""){
-        if($set!=""){
-            $this->state("is_instance");
-            $this->db_id=$set;
-            return $this;
-        }else{
-            return $this->db_id;
-        }
+    protected function OnBuild() {
         
     }
     
-    
+    /**
+     * This Event is fired when model is turned into formular
+     * This event is overridden in descendant class files 
+     * It is used to manage formular field presentation and design
+     * 
+     * @see model::formular($type) 
+     * @param string $type
+     * 
+     */
+    protected function OnFormular($type) {
+        
+    }
     
     /**
-     * @deprecated
-     * @return string
+     * This Event is fired when model state becomes a "selection"
+     * Use it to assign properties types, requided, comments ... 
+     *
+     * @see model::read()
      */
-    public function label(){
-        $label="";
-        $this->properties()->find("text","type")->each(function(property $prop)use(&$label){
-            $label .= " ". $prop->val();
-        });
-            return $label;
+    protected function OnSelection() {
+        
+    }
+    
+    /**
+     * This Event is fired when model state becomes an "instance"
+     * Use it to assign properties types, requided, comments ... 
+     * 
+     * @see model::read()
+     */
+    protected function OnInstance() {
+        
+    }
+    
+    /**
+     * This Event is fired when model is updated
+     * Use it to realize special treatments after object update 
+     * 
+     * @see model::update($id)
+     */
+    protected function OnUpdate() {
+        
+    }
+    
+    /**
+     * This Event is fired when model is created
+     * Use it to realize special treatments once new instance is created
+     * 
+     * @see model::create()
+     */
+    protected function OnCreate() {
+        
+    }
+
+    /**
+     * This Event is fired when model is deleted
+     * Use it to realize special treatments
+     * 
+     * @see model::delete()
+     */    
+    protected function OnDelete() {
+        
+    }
+    
+    /**
+     * This Event is fired when model is updated
+     * 
+     * @see model::update() 
+     * @return \xuserver\v5\model
+     */
+    protected function OnUpload() {
+        if(count($_FILES)==0){
+            return $this;
+        }
+        $target_dir = $this->disk(true)->directory;
+        
+        $message="";
+        foreach($_FILES as $key => $upload){
+            
+            /*
+             $uploadOk = 1;
+             $max_upload_size = (int)(ini_get('upload_max_filesize'));
+             if ($upload["size"] > $max_upload_size) {
+             $message .="Upload complete !<br/>";
+             $uploadOk = 0;
+             continue;
+             }*/
+            $fileError = $upload["error"];
+            switch($fileError) {
+                case UPLOAD_ERR_INI_SIZE:
+                    $message .="File exceeds " . ini_get('upload_max_filesize') ." max size ($fileError) <br/>";
+                    break;
+                case UPLOAD_ERR_PARTIAL:
+                    $message .="File exceeds max size in html form ($fileError) <br/>";
+                    break;
+                case UPLOAD_ERR_NO_FILE:
+                    //$message .="No file was uploaded ($fileError) <br/>";
+                    break;
+                case UPLOAD_ERR_NO_TMP_DIR:
+                    $message .="No /tmp dir to write to ($fileError) <br/>";
+                    break;
+                case UPLOAD_ERR_CANT_WRITE:
+                    $message .="Error writing to disk ($fileError) <br/>";
+                    break;
+                default:
+                    // No error ";
+                    break;
+            }
+            
+            $Key=xs_decrypt($key);
+            if ($fileError===0) {
+                $target_file = $target_dir .$Key.".".$upload["name"] ;
+                if (move_uploaded_file($upload['tmp_name'], $target_file)) {
+                    $message .="Upload complete !<br/>";
+                }else{
+                    
+                }
+            }
+        }
+        
+        if($message!=""){
+            echo notify($message);
+        }
+        
+        return $this;
     }
     
 }
@@ -1639,23 +1848,36 @@ class modelPublic extends modelProtected{
 
 /**
  * ORM Model class
- *
+ * 
+ * Common public methods of model object
+ * 
  * @author gael jaunin
  *
  */
-class model extends modelPublic{
-    
-    private $_title="__EMPTY__";
+class model extends modelEvents{
     
     
     /**
-     * build model properties, relations and methods
+     * Build Model Properties, Relations and Methods on a given database table
+     * If you designed a child class, extending model, to describe a specific class, ou may use Build() function to mount it automatically 
+     * 
+     * USAGE 
+     * $Class = new \xuserver\v5\model();
+     * $Class->build('customer');
+     * 
+     * EXAMPLES
+     * #Model_build
+     * 
      * @param string $db_tablename
-     * @return \xuserver\v5\model
+     * The name of the table to Modelize
+     * 
+     * @return \xuserver\v5\model 
+     *
+     * @see properties, methods, relations
      */
     public function build($db_tablename="__AUTO__"){
         // destroy current model definition;
-        $this->Init();
+        $this->__reset();
         
         // build model ;
         if($db_tablename=="__AUTO__"){
@@ -1664,12 +1886,7 @@ class model extends modelPublic{
         }else{
             $this->db_tablename=$db_tablename;
         }
-        /*
-         $this->_type="table";
-         $this->_name=$this->db_tablename;
-         $this->_value="0" // name of the first text field ?;
-         */
-        
+                
         // build mysql model ;
         $driver=$this->db->driver();
         if($driver == 'mysql'){
@@ -1788,37 +2005,54 @@ class model extends modelPublic{
         return $this;
     }
     
-    public function buildString($set="__NULL__"){
-        if($set!="__NULL__"){
-            return xs_encrypt($set) ;
-        }else{
-            return xs_encrypt($this->db_tablename()."-".$this->db_id()) ;
-        }
-    }
     
+    /**
+     * Title of a Model instance
+     * 
+     * @see \xuserver\v5\model\title($set)
+     * 
+     */
+    private $_title="__EMPTY__";
     
+    /**
+     * Array used to define a model::$_title when model has no text property    
+     *
+     * @see \xuserver\v5\model\title($set)
+     */
+    private $_titleArray = array();
+        
+    /**
+     * Get or Set the Model instance "title"
+     * 
+     * EXAMPLES
+     * #Model_title
+     * 
+     * @param string $set
+     * @return \xuserver\v5\model | string | boolean | string
+     * 
+     * @todo rename $titleProp
+     * @todo bring together title(), $_title and $_titleArray 
+     */
     public function title($set="__NULL__"){
         if($set!="__NULL__"){
             $this->_title=$set;
             return $this;
         }else{
-            // fetch first text property
             if($this->_title=="__EMPTY__"){
                 
             }else{
                 return $this->_title;
             }
-            
-            
             $title=false;
+            $titleProp="";
             $titlefk=array();
             $found=0;
-            
-            $this->properties()->all(function(property $prop)use(&$title,&$found,&$titlefk){
+            $this->properties()->all(function(property $prop)use(&$title,&$titleProp,&$found,&$titlefk){
                 if(!$prop->is_virtual()){// prop not virtual
                     if($found===0){// title not yet found
                         if($prop->type() =="text" ){// prop is a text
-                            $title=$prop; // set title prop
+                            $title=true; // set title true
+                            $titleProp=$prop; // set title prop
                             $found++;// title is found
                         }
                     }else{// title found
@@ -1839,7 +2073,14 @@ class model extends modelPublic{
                 return $title;
             }else{
                 // fetch first prop val
-                return $title->val();
+                //$titleProp->required(1);
+                
+                $title = $titleProp->val();
+                if($title==""){
+                    $title="new ...";
+                }
+                
+                return $title;
             }
             /*
             if(is_object($this->_title)){
@@ -1850,12 +2091,26 @@ class model extends modelPublic{
         }
     }
     
+
+    
+    
     /**
-     * set or retrieve model property values
-     * {@inheritDoc}
-     * @see \xuserver\v5\iteratorItem::val($set)
+     * Get or Set tme Model property values
+     *
+     * USAGE
+     * // form submit
+     * $customer->val($_POST);  
+     * EXAMPLE
+     * #Model_val_array
+     * #Model_val_object
+     * @param mixed $values
+     * - Retrieve model property values in a stdClass object 
+     * - null : set properties to null (reset object)
+     * - Array : set model property values using array key and values (typically $_POST)
+     * - Object : set model property values using object property values (can be a stdClass or a model object)
+     * 
+     * @see \xuserver\v5\iteratorItem::val()
      */
-    private $_titleArray = array();
     public function val($values="__NULL__"){
         if(is_null($values)){
             $this->properties()->each(function(property $prop){
@@ -1931,6 +2186,54 @@ class model extends modelPublic{
         $this->properties()->Empty();
         return $this;
     }
+    
+    
+    
+    /**
+     * Create model instance or selection in Database
+     * 
+     * USAGE
+     * // change values on customer and create new one 
+     * $NewCustomer = $customer->create($_POST);
+     * // copy customer 
+     * $NewCustomer = $customer->create();
+     * 
+     * @return model 
+     * if Database insert is ok, The new Model Instance is retured, otherwise the calling instance itself
+     * @param mixed $values Array | model
+     * if given set val($values) is fired on current Model Instance
+     * @todo dont change values on current instance
+     */
+    public function create($values="__NULL__"){
+        if( is_array($values) or is_object($values)){
+            $this->val($values);
+        }else{
+            
+        }
+        
+        $sql_insert=$this->sql()->statement_insert();
+        
+        $statement = $this->db->execute($sql_insert,$this->sql()->values());
+        if( $statement ===false ){
+            
+            if($this->db->db_error()->getCode()==23000){
+                echo notify("<h4>DUPLICATE</h4>".$this->db->db_error()->getMessage());
+            }else{
+                echo notify($this->db->db_error()->getMessage());
+            } 
+            
+            $return=$this;
+            
+        }else{
+            $this->OnCreate();
+            $this->properties()->Empty();
+            $return = Build($this->db_tablename());
+            $return->read($this->db->lastInsertId);
+        }
+        return $return;
+    }
+    
+    
     /**
      * read model instance from database
      * @param number $id
@@ -1990,21 +2293,6 @@ class model extends modelPublic{
         return $this;
     }
     
-    public function formular($type=""){
-        $this->OnFormular($type);
-        return $this->ui->form();
-    }
-    
-    public function button($caption,$method,$bsclass,$title,$uid=""){
-        if($uid==""){
-            $buildString=$this->buildString();
-        }else{
-            $buildString=$this->buildString($uid) ; 
-        }
-
-        $spanuid= hash("sha256","span-$buildString-$caption");
-        return "<a id=\"$spanuid\" href=\"$buildString\" method=\"$method\" class=\"xs-link btn $bsclass\" title=\"$title\" >$caption</a>  ";
-    }
     
     /**
      * update model instance or selection
@@ -2028,7 +2316,7 @@ class model extends modelPublic{
             echo debug($sql_update);
             $return=$this;
         }else{
-            $this->upload();
+            $this->OnUpload();
             
             if(count($this->_titleArray)>0){ // XUSERVER_POST_IGNORE
                 foreach($this->_titleArray as $key => $val){
@@ -2043,119 +2331,6 @@ class model extends modelPublic{
         return $return;
     }
     
-    public function disk($create=false){
-        //$uri = str_replace('xuserver\\', 'xs-framework\\', get_class($this));
-        //$uri=str_replace('\\', '/', $uri);
-        $uri = "xs-framework/uploads/".$this->db_tablename()."/".$this->db_id()."/";
-        
-        $directory= $_SERVER['DOCUMENT_ROOT']. '/'.$uri ;
-        
-        if (!file_exists($directory) and $create) {
-            mkdir($directory, 0777, true);
-        }
-        $url=str_replace('\\', '/', $uri);
-        //echo debug("uri : $uri <br/>directory : $directory <br/> url : $url<br/>");
-        $fileObj = new \stdClass();
-        $fileObj->directory = $directory;
-        $fileObj->uri = $uri;
-        $fileObj->url = "/".$url;
-        return $fileObj;
-        //require $_SERVER["DOCUMENT_ROOT"]."/xs-framework/".str_replace('\\', '/', $class).".php";
-    }
-    
-    /**
-     * save uploaded documents on model form submit
-     * @todo finish
-     * @return \xuserver\v5\modelPublic
-     */
-    protected function upload() {
-        if(count($_FILES)==0){
-            return $this;
-        }
-        $target_dir = $this->disk(true)->directory;
-        
-        $message="";
-        foreach($_FILES as $key => $upload){
-            $uploadOk = 1;
-            /*
-            $max_upload_size = (int)(ini_get('upload_max_filesize'));
-            if ($upload["size"] > $max_upload_size) {
-                $message .="Upload complete !<br/>";
-                $uploadOk = 0;
-                continue;
-            }*/
-            $fileError = $upload["error"];
-            switch($fileError) {
-                case UPLOAD_ERR_INI_SIZE:
-                    $message .="File exceeds " . ini_get('upload_max_filesize') ." max size ($fileError) <br/>";
-                    break;
-                case UPLOAD_ERR_PARTIAL:
-                    $message .="File exceeds max size in html form ($fileError) <br/>";
-                    break;
-                case UPLOAD_ERR_NO_FILE:
-                    //$message .="No file was uploaded ($fileError) <br/>";
-                    break;
-                case UPLOAD_ERR_NO_TMP_DIR:
-                    $message .="No /tmp dir to write to ($fileError) <br/>";
-                    break;
-                case UPLOAD_ERR_CANT_WRITE:
-                    $message .="Error writing to disk ($fileError) <br/>";
-                    break;
-                default:
-                    // No error ";
-                    break;
-            }
-            
-            $Key=xs_decrypt($key);
-            if ($fileError===0) {
-                $target_file = $target_dir .$Key.".".$upload["name"] ;
-                if (move_uploaded_file($upload['tmp_name'], $target_file)) {
-                    $message .="Upload complete !<br/>";
-                }else{
-                    
-                }
-            }
-        }
-        
-        if($message!=""){
-            echo notify($message);
-        }
-        
-        return $this;
-    }
-    
-    /**
-     * create model instance or selection
-     * @param mixed $values
-     */
-    public function create($values="__NULL__"){
-        if( is_array($values) or is_object($values)){
-            $this->val($values);
-        }else{
-            
-        }
-        
-        $sql_insert=$this->sql()->statement_insert();
-        
-        $statement = $this->db->execute($sql_insert,$this->sql()->values());
-        if( $statement ===false ){
-            
-            if($this->db->db_error()->getCode()==23000){
-                echo notify("<h4>DUPLICATE</h4>".$this->db->db_error()->getMessage());
-            }else{
-                echo notify($this->db->db_error()->getMessage());
-            } 
-            
-            $return=$this;
-            
-        }else{
-            $this->OnCreate();
-            $this->properties()->Empty();
-            $return = Build($this->db_tablename());
-            $return->read($this->db->lastInsertId);
-        }
-        return $return;
-    }
     
     /**
      * delete model instance or selection
@@ -2182,13 +2357,87 @@ class model extends modelPublic{
         return $return;
     }
     
+    
+    /**
+     * Append an item in a relation
+     * @param string $relationName
+     * @return string
+     */
+    public function append($relationName){
+        $relation = $this->relations()->Fetch($relationName);
+        $item=$relation->Create();
+        $relationSelection = $relation->Read();
+        return $relationSelection->ui->list() . $item->formular("create");
+    }
+    
+    /**
+     * Return a user designed formular type, using model->ui->form() method
+     * This method is very usefull in herited module developpement  
+     * 
+     * @param string $type (typically "create, "search", "register") 
+     * @return string (html form)
+     */
+    public function formular($type=""){
+        $this->OnFormular($type);
+        return $this->ui->form();
+    }
+    
+    
+    /**
+     * Retrieve stdClass representing the "physical directory" 
+     * where the model will store the uploaded files (sent by form) 
+     * 
+     * @see model::OnUpload()
+     * @param boolean $create
+     * @return \stdClass
+     */
+    public function disk($create=false){
+        $uri = "xs-framework/uploads/".$this->db_tablename()."/".$this->db_id()."/";
+        $directory= $_SERVER['DOCUMENT_ROOT']. '/'.$uri ;
+        if (!file_exists($directory) and $create) {
+            mkdir($directory, 0777, true);
+        }
+        $url=str_replace('\\', '/', $uri);
+        $dir = new \stdClass();
+        $dir->directory = $directory;
+        $dir->uri = $uri;
+        $dir->url = "/".$url;
+        return $dir;
+    }
+    
+    
+    
+    
+    
 }
 
 
 
 
-
+/**
+* ITERATOR FOR MODEL PROPERTIES
+*
+* This iterator belongs to modelStructure class
+* It contains the list of accessible model built property 
+*  
+* @see xuserver\v5\model
+*
+*/
 class properties extends iterator{
+    
+    /**
+     * Select specified model properties in the SQL statement.
+     * 
+     * USAGE
+     * First select desired property set using find()   
+     * Then assing them in the SQL statement using select()
+     * 
+     * EXAMPLE
+     * $customer->properties()->find("phone")->select(); 
+     *
+     * #props_select
+     * @return \xuserver\v5\properties
+     */
     public function select(){
         $this->found();
         $this->Model->sql()->select()->statement();
@@ -2196,6 +2445,21 @@ class properties extends iterator{
         return $this;
     }
     
+    /**
+     * Use selected properties in WHERE SQL statement.
+     * 
+     * USAGE
+     * First find() properties and give the a val() 
+     * (You can also directly use "overloaded names") 
+     * Then assing them to WHERE statement, using where()
+     * 
+     * EXAMPLE
+     * 
+     * $customer->properties()->find("phone")->select()->where(); 
+     *
+     * #props_select
+     * @return \xuserver\v5\properties
+     */
     public function where($andor="AND"){
         
         if($this->Model->state()=="is_instance"){
@@ -2242,18 +2506,21 @@ class relations extends iterator{
     }
 }
 
+
+/**
+ * ITERATOR MODEL METHODS
+ * 
+ * model methods iterator
+ *
+ */
 class methods extends iterator{
-    
-    
-    
-    
     
     
     
 }
 
 
-class propertyPrivate extends iteratorItem{
+class propertyAttributes extends iteratorItem{
     
     private $is_disabled=0;
     public function disabled($set=3){
@@ -2359,26 +2626,21 @@ class propertyPrivate extends iteratorItem{
     
 }
 
-class property extends propertyPrivate{
+/**
+* ITERATORITEM FOR MODEL PROPERTY
+* 
+* Property class is the iteratorItem of model properties.
+* It match the database fields, allows to turn model into sql statement or html form inputs
+* 
+*/
+class property extends propertyAttributes{
     
     public $ui="";
-    
-    
-    
     private $_values="";
-    
     private $_title="no title";
-    
-    
-    
-    
     private $_operator="=";
     private $_andor="AND";
-    
-    
     protected $is_key=0;
-    
-    
     
     public function __construct(){
         $this->ui=new property_ui($this);
@@ -2820,11 +3082,34 @@ class relation extends iteratorItem{
         }
     }
     
+    /**
+     * tries to create a model instance corresponding to foreign key
+     * @return \xuserver\v5\model
+     */
+    public function Create(){
+        
+        if($this->Model->state()=="is_instance"){
+            $tablename = $this->name();
+            $dual=Build($tablename);
+            $dual->properties()->Fetch($this->_type)->val($this->_value);
+            //$dual->properties()->select()->where();
+            $newItem = $dual->create();
+            $newItem->Model = $this->Model;
+            return $newItem;
+        }else{
+            return $this->Model;
+        }
+    }
     
 }
 
 
-
+/**
+ * ITERATOR MODEL METHODS
+ * 
+ * model methods iteratorItem
+ *
+ */
 class method extends iteratorItem{
     private $is_selected = 0;
     private $_caption = "__NULL__";
@@ -2853,7 +3138,7 @@ class method extends iteratorItem{
                     $this->_caption = "refresh";
                     $this->formmethod("get");
                 }else{
-                    $this->_caption = trim(str_replace(array("_","form","post")," ",$this->_name));
+                    $this->_caption = trim(str_replace(array("btn_","_","form")," ",$this->_name));
                 }
             }
             return $this->_caption;
@@ -2920,8 +3205,12 @@ class model_ui{
     private $_uid="";
     private $_head="";
     private $_footer="";
-    public function __construct(model &$parent){
-        $this->parent=$parent;
+    public function __construct(model &$parent=null){
+        if(is_null($parent)){
+        }else{
+            $this->parent=$parent;
+        }
+        
     }
     
     /**
@@ -2953,12 +3242,13 @@ class model_ui{
     
     
     public function head($set="__NULL__",$desc=""){
+        $href=$this->parent->state() . "#".$this->parent->db_id();
         if($set!="__NULL__"){
-            $this->_head="<h3>$set</h3><div class='form-group small'>$desc</div>";
+            $this->_head="<h3 title=\"$href\">$set</h3><div class='form-group small' title=\"$href\">$desc</div>";
             return $this;
         }else{
             if($this->_head==""){
-                return $this->head($this->parent->title(),$this->parent->state() . " ".date("D/M/Y H:i:s") )->head();
+                return $this->head($this->parent->title(),$this->parent->db_tablename())->head();
             }else{
                 return $this->_head;
             }
@@ -2970,21 +3260,25 @@ class model_ui{
             return $this;
         }else{
             if($this->_footer==""){
-                
+                return $this->footer($this->parent->href() . " ".date("D/M/Y H:i:s") )->footer();
             }else{
                 return $this->_footer;
             }
         }
     }
     
-    public function card($content="",$tag="div",$class=""){
+    public function card($content="",$tag="div",$class="",$withmethods=true){
         
         $methods = "";
-        $this->parent->methods()->all(function(method $method)use(&$methods){
-            if($method->is_selected()){
-                $methods.= $method->ui->input();
-            };
-        });
+        
+        if($withmethods){
+            $this->parent->methods()->all(function(method $method)use(&$methods){
+                if($method->is_selected()){
+                    $methods.= $method->ui->input();
+                };
+            });
+        }
+        
         
         if($tag=="form"){
             $attrs="method='post' enctype='multipart/form-data'";
@@ -2996,10 +3290,16 @@ class model_ui{
         if($class==""){
             $class=$bsClass;
         }
-
+           
+                   
+        if($this->parent->state()=="is_instance" and $methods!=""){
+            //$btnRefresh = "<a href=\"".$this->parent->Model->href()."\" method='formular' class='xs-link close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&#8635;</span></a>";
+        }
+        $btnRefresh = "";
         return "
         <$tag id=\"".$this->uid()."\" $attrs class='$class' >
             <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>
+            $btnRefresh
             ".$this->head()."
             $content
             <div class='form-group'>
@@ -3010,6 +3310,21 @@ class model_ui{
         ";
     }
     
+    public function killForm(){
+        return "<form id='".$this->uid()."'></form>";
+    }
+    public function killTr(){
+        $uid = $this->parent->db_tablename()."-tr-uid-".$this->parent->db_id();
+        return "<table ><tr id=\"$uid\" ></tr></table>";
+    }
+    
+    public function killList(){
+        $uid = $this->parent->db_tablename()."-list-uid-".$this->parent->db_id();
+        return "<a id='$uid' class='xs-link'></a>";
+    }
+    
+    
+    
     public function form(){
         if($this->parent->properties()->Count("selection")<1){
             $this->parent->properties()->find("text","type");
@@ -3017,7 +3332,7 @@ class model_ui{
         
         $content ="
             <div>
-                <input type='hidden' name='model_build' value=\"".$this->parent->buildString()."\" />
+                <input type='hidden' name='model_build' value=\"".xs_encrypt($this->parent->href())."\" />
                 <input type='hidden' name='model_method' value='' />
             </div>";
         
@@ -3035,6 +3350,29 @@ class model_ui{
         
     }
     
+    
+    public function list(){
+        $content = "";
+        
+        $this->parent->iterator()->each(function($item) use(&$content){
+            $href = $item->href();
+            $db_id = $item->db_id();
+            $title = $title="#$db_id " .$item->title();
+            $content.= xs_link($item->db_tablename() ."-list-uid-$db_id", $href, "formular", $title, "list-group-item list-group-item-action");
+        });
+        
+        $href= $this->parent->Model->href();
+        $nomCollection = $this->parent->db_tablename();
+        $badd = xs_link("", $href, "append('$nomCollection')", "+","btn border-primary");
+        
+        $this->head($this->parent->db_tablename(),$badd);
+        $this->footer("");
+        
+        $content="<div class='list-group'>$content</div>";
+        
+        return $this->card($content,"div","",false);
+    }
+    
     public function table(){
         $thead = "<thead>";
         $tbody = "<tbody>";
@@ -3050,8 +3388,6 @@ class model_ui{
                     $thead.="<th>".$prop->name()."</th>";
                     $cntspan++;
                 }
-                
-                
             }
         });
         ;
@@ -3059,8 +3395,11 @@ class model_ui{
         
         $cnt = 0;
         $this->parent->iterator()->each(function($item)use(&$tbody,&$cnt){
-            $tbody .= "<tr>";
+            
             $db_id=$item->db_id();
+            $uid=$item->db_tablename() ."-tr-uid-$db_id";
+            $tbody .= "<tr id='$uid'>";
+            
             $tbody.="<td><input type='checkbox' class='xs-action' name=\"ids[]\" value=\"$db_id\" /></td>";
             $cnt++;
             $item->properties()->each(function(property $prop)use(&$tbody,&$cnt, &$item){
@@ -3077,12 +3416,12 @@ class model_ui{
                         $tbody.="";
                     }else{
                         if($prop->is_primarykey() ){
-                            $button = xs_link("", $item->buildString() , "form", "#".$prop->val(), "border-secondary", "");
+                            $button = xs_link("", $item->href() , "form", "#".$prop->val(), "btn text-primary border-primary", "");
                             $tbody.="<td>".$button."</td>";
                             
                             //$tbody.="<td>".$item->button("#".$prop->val(), "form", "","")."</td>";
                         }else if($prop->type()=="fk"){
-                            $button = xs_link("", $prop->db_foreigntable() ."-".$prop->val(), "form", "#".$prop->val(), "", "");
+                            $button = xs_link("", $prop->db_foreigntable() ."-".$prop->val(), "form", "#".$prop->val(), "btn border-secondary", "");
                             $tbody.="<td>".$button."</td>";
                             
                             
@@ -3099,26 +3438,34 @@ class model_ui{
         ;
                 
         $this->parent->properties()->Empty();
-        //$link=$this->parent->db_tablename();
-        /*$tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows
-            <a href='$link-0' method='form' class='xs-link' >found</a> |
-            <a href='$link-0' method='create' class='xs-link' >create</a> |
-            <a href='$link-0' method='delete' class='xs-action' >delete</a>
+        $link=$this->parent->db_tablename();
+        $tfoot = "<tr><th colspan='".($cntspan)."'>$cnt rows
+            ". xs_link("", $link, "create", "create", "btn btn-light ", "") ."
+            ". xs_link("", $link, "delete", "delete", "btn btn-light xs-action", "") ."
             </th></tr>";
-        */
-        $tfoot="<tr><th colspan='".($cntspan)."'>$cnt rows</th></tr>";
         
-        return "<div id=\"".$this->uid()."\">
+        //$tfoot="<tr><th colspan='".($cntspan)."'>$cnt rows</th></tr>";
+        
+        $tableTitle = $this->parent->db_tablename();
+        $uid= "$tableTitle-table-uid";
+        
+        $this->head($tableTitle,"");
+        $this->footer("");
+        
+        return "<div id=\"".$uid."\">
             <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>
             ".$this->head()."
             <table class='table table-stripped table-bordered '>".$thead.$tbody.$tfoot."</table>
             ".$this->footer()."</div>";
     }
     
-    public function structure(){
+    public function structure($passthru=false){
         $session = session();
-        if(!$session->admin()){
-            return notify("Aide indisponible","light");
+        
+        if(!$passthru){
+          if(!$session->admin()){
+              return notify("Acces denied, can't display structure","light clear");
+          }
         }
         
         $return="";
@@ -3135,7 +3482,7 @@ class model_ui{
             if($this->parent->iterator()->Count() >0){
                 /*
                 $this->parent->iterator()->all(function ($item) use (&$lines){
-                    $lines .= "<li>".$item->label()."</li>";
+                    $lines .= "<li>".$item->title()."</li>";
                 });
                 */
             }else{
@@ -3388,8 +3735,9 @@ class relation_ui{
         $this->parent=$parent;
     }
     public function input(){
-        return "<a href=''>".$this->parent->name()."</a>.<a href=''>".$this->parent->val()."</a>";
+        return xs_link("", $this->parent->name(), "read", $this->parent->name(), "btn btn-light");
     }
+    
 }
 
 class method_ui{
@@ -3406,9 +3754,8 @@ class method_ui{
         if($formmethod=="post"){
             return "<input type='submit' method='$method' formmethod='$formmethod' value='$caption' class='btn $bsclass' title='$formmethod $caption' />  ";
         }else{
-            //return $this->parent->Model->button($caption,$method,$bsclass,$formmethod);
             
-            $href = $this->parent->Model->buildString();
+            $href = $this->parent->Model->href();
             $title = "$formmethod $caption";
             $uid= "";
             return xs_link($uid, $href, $method, $caption, $bsclass, $title);

@@ -48,9 +48,13 @@ var xsRouter = "/xs-framework/v5/router.php";
 
 var $myScreen = "";
 var xsNotifications;
+var xsSpinner;
 function xsLayout(){
-    xsNotifications = $("<div style='z-index:999; position: fixed; right:0; padding-top:5px; width:300px; min-height:1px;' />")
+    xsNotifications = $("<div style='z-index:9999; position: fixed; right:0; padding-top:5px; width:300px; min-height:1px;' />")
     $("body").prepend(xsNotifications);
+    xsSpinner = $("<div style='z-index:9999; position: fixed; margin:5px 5px 5px 5px;' class='spinner-border sticky-top float-center text-danger' role='status'>      <span class='sr-only'>Loading...</span>   </div>")
+    $('body').prepend(xsSpinner)
+    
     
 }
 
@@ -64,6 +68,8 @@ $( document ).ready(function() {
 	loadScript("https://cdn.jsdelivr.net/gh/xcash/bootstrap-autocomplete@v2.3.7/dist/latest/bootstrap-autocomplete.min.js").then(function(){
 		duplicateIDs($("body"))
 	    ajaxResponse($("body"));
+        xsSpinner.hide()
+        xsNotifications.show()
 	});
 	
 });
@@ -128,27 +134,14 @@ function ajaxResponse(html){
 	}
 	
     console.groupCollapsed("xs class")
-    console.log(".xs-link")
-    $html.find("a.xs-link").click(function(e) {
-    	var $link = $(this);
-    	var fd = new FormData();
-    	fd.append("model_build",$link.attr("href"));
-    	fd.append("model_method",$link.attr("method"));
-		fdPost(fd)
-		e.preventDefault();
-	});
     
-    console.log("button.close")
-    $html.find("button.close").click(function(e) {
-    	var $link = $(this);
-    	$link.parent().remove()
-	});
-    
+    console.log("table.xs-action")
     $html.find("table").each(function() {
     	var $table = $(this);
 		if(! $table.hasClass("xs-table")){
 			$table.addClass("xs-table").find("a.xs-action").each(function(){
 				var $link = $(this);
+				$link.removeClass("xs-link")
 				$link.click(function(e){
 					var fd = new FormData();
 					fd.append("model_build",$link.attr("href"));
@@ -164,14 +157,48 @@ function ajaxResponse(html){
 			});
 		}
 	});
+    
+    console.log(".xs-link")
+    $html.find("a.xs-link").click(function(e) {
+    	var $link = $(this);
+    	var fd = new FormData();
+    	fd.append("model_build",$link.attr("href"));
+    	fd.append("model_method",$link.attr("method"));
+		fdPost(fd)
+		e.preventDefault();
+	});
+    
+    console.log(".xs-link-get")
+    $html.find("a.xs-link-get").click(function(e) {
+    	var $link = $(this);
+		fdGet($link.attr("href"))
+		e.preventDefault();
+	});
+    
+    console.log("button.close")
+    $html.find("button.close").each(function(){
+        var b= $(this);
+        if(b.attr("data-dismiss")!="modal"){
+            b.click(function(e) {
+                var $link = $(this);
+                b.parent().remove();
+            });
+        }
+        
+    })
+    
+    
      
     console.log(".xs-notify")
     if($html.find(".xs-notify.clear").length != 0 ){
     	xsNotifications.find(".xs-notify").remove();
     }
     $html.find(".xs-notify").each(function() {
-        var $notification = $(this).hide();
+        var $notification = $(this);
         xsNotifications.prepend($notification.fadeIn());
+        $notification.click(function(){
+            $notification.remove()
+        });
         setTimeout(function(){ $notification.fadeOut(400, function(){$notification.remove();}) }, 5000);
     });
     console.log(".xs-debug")
@@ -180,6 +207,14 @@ function ajaxResponse(html){
         $myScreen.prepend($notification.addClass("sticky-top"));
         setTimeout(function(){ $notification.fadeOut().remove() }, 5000);
     });
+    
+    console.log(".xs-modal")
+    $html.find("div.xs-modal,form.xs-modal").each(function() {
+        var $element = $(this);
+        //$(this).attr("id","");
+        bsModal($element);
+    });
+    
     console.groupEnd()
 
     console.groupCollapsed("dispatch ID")
@@ -189,9 +224,12 @@ function ajaxResponse(html){
 		$ajaxResponseDispatchNode($form)
 	});
     
-	$html.find("div[id], span[id],a.xs-link[id]").each(function() {
+    
+    
+	$html.find("div[id], span[id], a.xs-link[id], tr[id]").each(function() {
     	var $element = $(this);
-        $ajaxResponseDispatchNode($element)
+    	console.log(" TR ?? "+$element.prop("tagName")+"[id='"+$element.attr("id")+"']");
+    	$ajaxResponseDispatchNode($element)
 	});
     console.groupEnd()
     
@@ -199,8 +237,16 @@ function ajaxResponse(html){
     if($html.prop("tagName")=="BODY"){
         
 	}else{
-        $myScreen.append($html);
-        //console.log($html.html().length)
+		if($html.text().trim() ==""){
+			
+		}else{
+			$html.prepend($("<button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button>").click(function(){
+				$html.remove()
+			}));
+			$myScreen.append($html);
+		}
+		console.log($html.text().length)
+		
 	}
     console.groupEnd()
     
@@ -341,6 +387,7 @@ function $ajaxFormFile(input) {
 
 
 function fdPost(fd){
+
 	$.ajax({
 		 type: "post",
 		 data: fd,
@@ -349,15 +396,43 @@ function fdPost(fd){
 		 contentType: false,
 		 cache: false,
 		 beforeSend: function() {
+            xsSpinner.show()
 			 //for (var value of fd.values()) {console.log(value);}
 		 },
 		 success: function(data) {
 			 ajaxResponse(data);
 		 },
 		 complete: function() {
+            xsSpinner.hide()
+		 },
+         error:function() {
+            xsSpinner.hide()
 		 }
 	 });
 }
+
+function fdGet(url){
+    $.ajax({
+		 type: "get",
+		 url: url,
+		 processData: false,
+		 contentType: false,
+		 cache: false,
+		 beforeSend: function() {
+            xsSpinner.show()
+		 },
+		 success: function(data) {
+			 ajaxResponse(data);
+		 },
+		 complete: function() {
+            xsSpinner.hide()
+		 },
+         error:function() {
+            xsSpinner.hide()
+		 }
+	 });
+}
+
 
 function $ajaxResponseDispatchNode(element){
 	var $body=$("body");
@@ -369,21 +444,28 @@ function $ajaxResponseDispatchNode(element){
 		
 		var existing = $body.find(selector);
     	if(existing==undefined){
+    		console.log("not found "+element.prop("tagName")+"#"+ element.attr("id"))
     		return false;
     	}
     	if(existing.length != 0 ){
     		console.log("replace "+element.prop("tagName")+"#"+ element.attr("id"))
     		existing.replaceWith(element);
+    			scrollTo(element)
             return true;
     	}else{
     		console.log("append "+element.prop("tagName")+"#"+ element.attr("id"))
     		$myScreen.append(element)
-    		//bsModal(element)
+    			scrollTo(element)
     		return false;
     	}
 	}
 }
 
+function scrollTo(element){
+	if(element.prop("tagName")=="FORM"){
+		element[0].scrollIntoView();
+	}
+}
 
 var bsZindex=1040;
 function bsModal(content, options) {
@@ -395,7 +477,7 @@ function bsModal(content, options) {
     }
     var content = $(content)
     options = jQuery.extend(defaults, options);
-  	var bs = $('<div class="modal '+options.animation+' bsModal " id="basicModal" tabindex="-1" role="dialog" aria-labelledby="basicModal" aria-hidden="true" />');
+  	var bs = $('<div class="modal '+options.animation+' bsModal " tabindex="-1" role="dialog" aria-labelledby="basicModal" aria-hidden="true" />');
     bs.dialog=$("<div class='modal-dialog "+options.size+"  ' />")
   	bs.container = $('<div class="modal-content container">');
   	bs.body = $('<div class="modal-body">').html(content);
@@ -408,13 +490,12 @@ function bsModal(content, options) {
   	bs.modal('show');
     bsZindex++;
     bs.css("z-index", bsZindex);
-    /*
+    
     bs.on('hidden.bs.modal', function (e) {
-    	console.log("remove modal");
+    	//console.log("remove modal");
     	$(this).data('bs.modal', null).remove();
-    	
     })
-    */
+    
     return bs;
 }
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * GJ 25/06/2020
+ * GJ 30/10/2020
  */
 
 /**********************************************************************************************************
@@ -8,19 +8,13 @@
  **********************************************************************************************************/
 
 // github.com template
- define('XUSERVER_DB_SERVER',"");   // Database server internet address
- define('XUSERVER_DB_NAME',"");     // Database name
- define('XUSERVER_DB_USERNAME',"");      // Database username
- define('XUSERVER_DB_PASSWORD',"");  // Database password
- define('XUSERVER_ENCRYPT', $_SERVER["SERVER_NAME"]."secretencryptionkey"); // user defined encryption key
- 
- define('XUSERVER_ADMIN_ID',""); // admin profile key !IMPORTANT
- 
- define('XUSERVER_POST_IGNORE', "POST_IGNORE@"); // prefix to ignored inputs _POST
- 
-  
-/**/
-
+define('XUSERVER_DB_SERVER',"");   // Database server internet address
+define('XUSERVER_DB_NAME',"");     // Database name
+define('XUSERVER_DB_USERNAME',"");      // Database username
+define('XUSERVER_DB_PASSWORD',"");  // Database password
+define('XUSERVER_ENCRYPT', $_SERVER["SERVER_NAME"]."SaltYourKey"); // user defined encryption key
+define('XUSERVER_ADMIN_ID',""); // admin profile key !IMPORTANT
+define('XUSERVER_POST_IGNORE', "POST_IGNORE@"); // prefix to ignored inputs _POST
 
 
 spl_autoload_register(function($class){

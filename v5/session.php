@@ -150,10 +150,46 @@ class session {
         }
         
         foreach ($this->authorisations as $k => $v) {
+            
+            
             $ret .= "<li class='text-success' style='cursor:pointer'><span>$k " . $v . "</span></li>";
         }
         return "<li><span>SESSION</span><ul>$prop</ul></li><li><span>PERMISSIONS</span><ul>$ret</ul></li>";
     }
+    
+    function modules(){
+        $menu="";
+        $permission = Build("auth_permission");
+        $href="auth_user-$this->id";
+        
+        foreach ($this->authorisations as $key=>$crud){
+            $permission->__Key($key);
+            $permission->__CRUD($crud);
+            if($permission->linestyle=="module" ){
+                $menu .= xs_link("", $href, "__session_tables('$permission->permModule')", $permission->permModule, "list-group-item list-group-item-action list-group-item-primary", "click to list instances");
+                
+                $menu .="<div id='session-modules-$permission->permModule-uid' class='list-group'></div>";
+                
+                
+            }
+        }
+        return "<div id='session-modules-uid' class='list-group'>$menu</div>" ;
+    }
+    function tables($module){
+        $menu="";
+        $permission = Build("auth_permission");
+        foreach ($this->authorisations as $key=>$crud){
+            $permission->__Key($key);
+            $permission->__CRUD($crud);
+            if($permission->__can("read") and $permission->linestyle=="table" and  $permission->permModule==$module){
+                $caption = str_replace("_"," ",$permission->permTable);
+                $caption = str_replace($permission->permModule,"",$caption);
+                $menu .= xs_link("", $permission->permTable, "read", $caption, "list-group-item list-group-item-action", "click to list instances");
+            }
+        }
+        return "<div id='session-modules-$module-uid' class='list-group'>$menu</div>" ;
+    }
+    
     function admin(){
         if (!isset($_SESSION["user"])) {
             return 0;
@@ -166,6 +202,90 @@ class session {
             
         }
     }
+    
+    /**
+     * can the session di something ? 
+     * @param string $Key
+     * @return boolean
+     */
+    function can($Key="__NULL__") {
+        $return = 0;
+        
+        if($Key=="__NULL__" or is_null($Key)){
+            return 0;
+        }
+        $permission = Build("auth_permission");
+        $permission->__Key($Key);
+        $privMethod = $permission->permMethod;
+                
+        if($privMethod=="create" or  $privMethod=="update" or $privMethod=="read" or $privMethod=="delete"){
+            $authKey = "$permission->permModule-$permission->permTable";
+            $CAN = $privMethod; 
+        }else{
+            $authKey = $Key;
+            $CAN = "use";
+        }
+        
+        if (isset($this->authorisations[$authKey])) {
+            $permission->__CRUD($this->authorisations[$authKey]);
+            $return = $permission->__can($CAN);
+        }else{
+            $return = 0;
+        }
+        if ($return) {
+            
+        }else{
+            
+        }
+        
+        
+        return $return;
+    }
+    
+    function can1($Key="__NULL__") {
+        if($Key=="__NULL__" or is_null($Key)){
+            return false;
+        }
+        
+        $parts=explode("-", $Key);
+        $privModule=$parts[0];
+        if(isset($parts[1])){
+            $privTable=$parts[1];
+        }
+        if(isset($parts[2])){
+            $privMethod=$parts[2];
+        }
+        
+        if($privMethod=="create" or  $privMethod=="update" or $privMethod=="read" or $privMethod=="delete"){
+            $Key = "$privModule-$privTable";
+            if (isset($this->authorisations[$Key])) {
+                            
+            }else{
+            }            
+                                    
+        }else{
+                    
+        }
+        
+        
+        if (isset($this->authorisations[$Key])) {
+            return true;
+        }else {
+            return false;
+        }
+    }
+    
+    function can0($Key="__NULL__") {
+        if($Key=="__NULL__" or is_null($Key)){
+            return false;
+        }
+        if (isset($this->authorisations[$Key])) {
+            return true;
+        }else {
+            return false;
+        }
+    }
+    
     /**
      * @deprecated
      */
@@ -195,22 +315,7 @@ class session {
         }
         return (bool)$this->logAs;
     }
-    /**
-     * @deprecated
-     */
-    function isAdmin() {
-        $GLOBAL_PROFILE_ADMIN_NAME = "administrator";
-        if ($this->logAs) {
-            return true;
-        }
-        if ($this->profileName == $GLOBAL_PROFILE_ADMIN_NAME) {
-            return true;
-        }
-        else {
-            return false;
-        }
-        
-    }
+    
     /**
      * @deprecated
      */
@@ -234,17 +339,7 @@ class session {
         return $return;
     }
     
-    /**
-     * @deprecated
-     */
-    function has($match) {
-        if (isset($this->authorisations[$match])) {
-            return $this->authorisations[$match];
-        }
-        else {
-            return false;
-        }
-    }
+    
     
 }
 
