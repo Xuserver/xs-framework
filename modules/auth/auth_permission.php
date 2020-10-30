@@ -61,52 +61,73 @@ class auth_permission extends \xuserver\v5\model{
             $this->can_delete=$set[3];
         }
         return "$this->can_create$this->can_read$this->can_update$this->can_delete";
-        
-        
+    }
+    
+    
+    public function __can($what){
+        if($what=="use"){
+            $CAN = "can_update";
+        }else{
+            $CAN = "can_$what";
+        }
+        return $this->$CAN;
     }
     
     private function line($type="create"){
-        $href = $this->buildString();
+        $href = $this->href();
         $key = $this->__Key();
         $uid = $this->fk_profile."-$key";
-        
+        $separator = "";
         
         if($this->linestyle =="module"){
-            $bsline="text-primary";
+            $bsline="dark";
+            $padding="";
+            $caption="[".strtoupper($key)."]";
             
+            $separator ="<hr />";
             if($type=="create"){
-                $buttons = "<div class='p-2'>".$this->btn_cant("create")."</div><div class='p-2'>".$this->btn_cant("read")."</div><div class='p-2'>".$this->btn_cant("update")."</div><div class='p-2'>".$this->btn_cant("delete")."</div>";
+                $bsline="secondary";
+                $buttons = "<div class='p-1'>".$this->btn_cant("create")."</div><div class='p-1'>".$this->btn_cant("read")."</div><div class='p-1'>".$this->btn_cant("update")."</div><div class='p-1'>".$this->btn_cant("delete")."</div>";
             }else{
-                $buttons = "<div class='p-2'>".$this->btn_can("create")."</div><div class='p-2'>".$this->btn_can("read")."</div><div class='p-2'>".$this->btn_can("update")."</div><div class='p-2'>".$this->btn_can("delete")."</div>";
+                $buttons = "<div class='p-1'>".$this->btn_can("create")."</div><div class='p-1'>".$this->btn_can("read")."</div><div class='p-1'>".$this->btn_can("update")."</div><div class='p-1'>".$this->btn_can("delete")."</div>";
             }
         }else if($this->linestyle =="table"){
-            $bsline="text-success";
-            
+            $bsline="primary";
+            $padding="T";
+            $caption="&nbsp; &nbsp; {".$this->permTable."}";
             if($type=="create"){
-                $buttons = "<div class='p-2'>".$this->btn_cant("create")."</div><div class='p-2'>".$this->btn_cant("read")."</div><div class='p-2'>".$this->btn_cant("update")."</div><div class='p-2'>".$this->btn_cant("delete")."</div>";
+                $bsline="secondary";
+                $buttons = "<div class='p-1'>".$this->btn_cant("create")."</div><div class='p-1'>".$this->btn_cant("read")."</div><div class='p-1'>".$this->btn_cant("update")."</div><div class='p-1'>".$this->btn_cant("delete")."</div>";
             }else{
-                $buttons = "<div class='p-2'>".$this->btn_can("create")."</div><div class='p-2'>".$this->btn_can("read")."</div><div class='p-2'>".$this->btn_can("update")."</div><div class='p-2'>".$this->btn_can("delete")."</div>";
+                $buttons = "<div class='p-1'>".$this->btn_can("create")."</div><div class='p-1'>".$this->btn_can("read")."</div><div class='p-1'>".$this->btn_can("update")."</div><div class='p-1'>".$this->btn_can("delete")."</div>";
             }
             
         }else if($this->linestyle =="method"){
-            $bsline="text-warning";
+            $bsline="warning";
+            $padding="M";
+            //$caption="&nbsp;&nbsp;$key()";
+            $caption="&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .$this->permMethod()";
             
             if($type=="create"){
-                $buttons = "<div class='p-2'>".$this->btn_cant("use")."</div>";
+                $bsline="secondary";
+                $buttons = "<div class='p-1'>".$this->btn_cant("use")."</div>";
             }else{
-                $buttons = "<div class='p-2'>".$this->btn_can("use")."</div>";
+                $buttons = "<div class='p-1'>".$this->btn_can("use")."</div>";
             }
             
         }else{
-            $bsline="text-dark";
+            $bsline="danger";
+            $padding="";
+            $caption="$key";
             $buttons ="";
         }
         
         if($type=="create"){
             return "
+        $separator
         <div class='d-flex flex-row' id=\"$uid\">
-            <div class='w-25 p-2'>
-                <a href='$href' class='btn btn-light btn-block text-left font-weight-normal $bsline xs-link' method=\"__createProfilePermission('".$this->fk_profile."','$key')\" >$key</a>
+            <div class='w-25 p-1'>
+                 <a href='$href' class='btn btn-outline-$bsline btn-block text-left font-weight-normal  xs-link' method=\"__createProfilePermission('".$this->fk_profile."','$key')\" >$caption</a>
             </div>
             $buttons
         </div>";
@@ -114,9 +135,10 @@ class auth_permission extends \xuserver\v5\model{
         }else{
             
             return "
+        $separator
         <div class='d-flex flex-row ' id=\"$uid\"> 
-            <div class='w-25 p-2 '>
-                <a href='$href' class='btn btn-light  btn-block text-left font-weight-bold $bsline xs-link' method=\"__deleteProfilePermission('".$this->fk_profile."','$key')\" >$key</a>
+            <div class='w-25 p-1'>
+                <a href='$href' class='btn btn-$bsline   btn-block text-left font-weight-bold  xs-link' method=\"__deleteProfilePermission('".$this->fk_profile."','$key')\" >$caption</a>
             </div>
             $buttons
         </div>";
@@ -226,15 +248,15 @@ class auth_permission extends \xuserver\v5\model{
         }
         
         if($this->$CAN){
-            $bsclass="btn-success";
+            $bsclass="btn btn-success";
             $method = "__remove('$caption')";
         }else{
-            $bsclass="btn-danger";
+            $bsclass="btn btn-danger";
             $method = "__add('$caption')";
         }
         $uid = $this->fk_profile."-".$this->__Key()."-$CAN";
         
-        $href = $this->buildString();
+        $href = $this->href();
         
         return xs_link($uid, $href, $method, $caption, $bsclass, "click to change status");
         //return $this->button($caption, $method, $bsclass, "$uid click to change status");
