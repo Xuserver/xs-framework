@@ -2,6 +2,7 @@
 namespace xuserver\modules\auth;
 
 use xuserver\v5\property;
+use xuserver\v5\method;
 
 class auth_user extends \xuserver\v5\model{
     var $authorisations=array();
@@ -27,30 +28,6 @@ class auth_user extends \xuserver\v5\model{
         $this->methods()->select(0)->find("#update,#create")->select(1);
     }
     
-    public function formular($type=""){
-        return $this->btn_account( $this->id_user );
-    }
-    
-    
-    
-    public function lock($opt="0"){
-        $this->properties()->find("#id_user, name,#auth_locked,#terms_conditions")->select();
-        $this->properties()->find("#terms_conditions")->val($opt)->where();
-        $this->read();
-        $return = $this->ui->table().$this->ui->structure();
-        if($opt=="0"){
-            $this->val(null)->properties()->find("#auth_locked")->val(1)->update();
-            $this->val(null)->properties()->find("#terms_conditions")->val(1)->where();
-            echo notify($opt.$this->sql()->statement());
-        }else{
-            $this->val(null)->properties()->find("#auth_locked")->val($opt)->update();
-            $this->val(null)->properties()->find("#terms_conditions")->val(1)->where();
-            echo notify($opt.$this->sql()->statement());
-        }
-        return $return;
-    }
-    
-    
     
     
     public function __session_modules(){
@@ -58,7 +35,15 @@ class auth_user extends \xuserver\v5\model{
         if(!$session->exist()){
             return $this->btn_login();
         }else{
-            return $session->modules();
+            if($session->admin()){
+                if($session->logas()){
+                }else{
+                    
+                }
+                return $session->modules($this);
+            }else{
+                return $session->modules();
+            }
         }
     }
     public function __session_tables($module){
@@ -76,10 +61,51 @@ class auth_user extends \xuserver\v5\model{
     public function btn_session(){
         $session = session();
         $this->properties()->find()->select(0);
-        $this->methods()->select("0")->find("btn_account,btn_profile,btn_session,logout")->formmethod("get")->select(1);
-        $this->ui->head("vos coordonnées","formulaire de session");
+        $this->methods()->select("0");
+        
+        
+        $this->ui->head("Informations de session",$this->__session_modules());
         $this->ui->footer("");
         return $this->ui->card($session->show(),"form");
+    }
+    
+    public function formular($type=""){
+        return $this->_menu( );
+    }
+    
+    public function _menu(){
+        $session = session();
+        $return = "";
+        if(!$session->exist()){
+            $return .= $this->btn_login();
+        }else{
+            $this->properties()->find("#email")->select();
+            $this->§email->type("display");
+            $this->methods()->select("0");
+            //$this->methods()->find("_menu,btn_account,logout")->formmethod("get")->select("1")->sort();
+            
+            $this->ui->head("Bienvenue dans votre espace personnel",$this->__session_modules());
+            
+            if($this->my_photo==""){
+                $photo = "<p>Vous n'avez pas choisi de photo pour votre compte<p>";
+            }else{
+                $disk=$this->disk();
+                $photo = "<img class='img-fluid img-thumbnail' style='width:150px' src='$disk->url$this->my_photo' />";
+            }
+            if($this->my_lastname==""){
+                $greetings="<p>Vous n'avez pas saisi votre nom et prénom.</p>";
+                $FL="Vous";
+            }else{
+                $greetings="";
+                $FL="$this->my_lastname $this->my_firstname, vous ";
+            }
+            $profname="<p>$FL avez le profil $this->auth_profile_profile</p>";
+            
+            $this->ui->footer("");
+            $return = $this->ui->card("<p><b>Bienvenue</b></p> $profname $photo $greetings<p>Merci de choisir une action dans votre menu</p>","form");
+            
+        }
+        return $return;
     }
     
     private function form_account(){
@@ -87,37 +113,34 @@ class auth_user extends \xuserver\v5\model{
         $this->properties()->find("#email, my_")->select();
         $this->properties()->find("#my_lastname, #my_firstname ")->required(1);
         $this->§email->type("display");
-        $this->methods()->select("0")->find("btn_account,btn_profile,btn_session,logout")->select(1);
-        $this->methods()->find("btn_profile,btn_recover_password,btn_session,logout")->formmethod("get")->select("1");
-        $this->methods()->find("btn_account,btn_profile,btn_session,btn_recover_password,logout")->sort();
+        $this->methods()->select("0")->find("btn_account")->select(1)->caption("Mettre à jour");
         
-        $this->ui->head("vos coordonnées","formulaire de contact utilisateur");
+        $this->ui->head("Formulaire de contact",$this->__session_modules());
         
+        //$this->ui->head("Formulaire de contact","@$this->id_user saisir vos information personnelles");
         
     }
     
     
-    public function btn_account($id=0){
+    public function btn_account(){
         $session = session();
         $return = "";
         if(!$session->exist()){
             $return .= $this->btn_login();
         }else{
-            if($id==0){
-                $this->read($session->id);
-            }else{
-                $this->read($id);
-            }
             $this->form_account();
             if(isset($_POST["my_firstname"])){
                 $this->update($_POST);
-                $return.=notify("updated ".date("Y-m-d H:i:s"),"success clear");
                 $return .= $this->ui->structure();
-                $session->user($this);
+                if($session->id == $this->id_user){
+                    $session->user($this);
+                }
             }
-            
-            
-            $this->ui->footer($this->__session_modules());
+            if($session->admin() and $session->logas()){
+                $this->§btn_account()->caption("back to admin")->select(1)->formmethod("get")->name("__log_back")->bsClass("danger");
+                $this->§update()->caption("mettre à jour")->select(1)->formmethod("post")->bsClass("warning");
+            }
+            $this->ui->footer("@$this->id_user saisir vos information personnelles");
             
             $return .= $this->ui->form();
         }
@@ -125,12 +148,107 @@ class auth_user extends \xuserver\v5\model{
         return $pinsession.$return;
     }
     
+    public function _log_as(){
+        $profile = $this->§auth_profile->Read();
+        $profile->log_as();
+        return $this->btn_account() . $profile->ui->killForm(). $profile->ui->killList();
+        
+    }
+    
+    public function __log_back(){
+        $profile = $this->§auth_profile->Read();
+        $profile->log_back();
+        return $this->btn_account() . $profile->ui->killForm(). $profile->ui->killList();
+        
+    }
+    
     private function form_profile(){
         $this->properties()->find("profile_profile")->select();
         $this->methods()->select("0")->find("btn_account,btn_profile,btn_session")->formmethod("get")->select("1")->sort();
     }
+    public function btn_profile(){
+        $session = session();
+        $return = "";
+        if(!$session->exist()){
+            $return .= $this->btn_login();
+        }else{
+            if($session->admin()){
+                $this->properties()->find("#auth_profile")->select();
+                
+                $this->update($_POST);
+                if($session->id == $this->id_user){
+                    $session->user($this);
+                }
+                
+                $this->methods()->select(0);
+                //$this->§_menu()->select(1)->formmethod("get");
+                $this->§btn_profile()->select(1)->formmethod("post")->caption("Mettre à jour");
+                //$this->§btn_session()->select(1)->formmethod("get");
+                $profile = $this->§auth_profile->Read();
+                $panel=$profile->__define_profile();
+                $panel="<div class='accordion'>
+                <div class='collapse' style='overflow-y:scroll;max-height:400px' id='form-session-1' >$panel</div>
+                </div>";
+                
+                $this->ui->head("Informations de profile",$this->__session_modules()."Vous pouvez modifier le profile de cet utilisateur $panel");
+                
+                /*
+                if($session->logas()){
+                    $this->§btn_profile()->bsClass("warning");
+                    $this->ui->head($this->my_lastname . " " .$this->my_firstname,"Vous pouvez modifier le profile de cet utilisateur $panel");
+                    $this->§auth_profile->caption("profile de l'utilisateur");
+                }else{
+                    $this->ui->head($this->my_lastname . " " .$this->my_firstname,"Attention vous modifiez le profil administrateur $panel" );
+                    $this->§auth_profile->caption("mon profile");
+                }
+                */
+                
+                $go = xs_link("", $profile->href(), "form", "Ouvrir la fiche profile profile","btn btn-link");
+                $this->ui->footer("<a class='btn btn-warning' data-toggle='collapse' href='#form-session-1' >details</a> $go");
+            }else{
+                
+                $this->properties()->find("auth_profile_profile")->select();
+                $this->§auth_profile_profile->caption("mon profile");
+                $this->methods()->select(0);
+                //$this->§_menu()->select(1)->formmethod("get");
+                
+                $this->§btn_profile()->select(1)->formmethod("get")->caption("Mettre à jour");
+                //$this->§btn_session()->select(1)->formmethod("get");
+                $this->ui->head("Informations de profile",$this->__session_modules()."Vous ne pouvez pas modifier votre profile utilisateur");
+                //$this->ui->head("Mon profile","Vous ne pouvez pas modifier votre profile utilisateur");
+                $this->ui->footer("");
+            }
+            $this->methods()->find("_menu,btn_profile,btn_session")->sort();
+            
+            $return = $this->ui->form();
+        }
+        return $return; 
+    }
     
+    /*
+    public function btn_define_profile(){
+        $session = session();
+        $return = "";
+        if(!$session->exist()){
+            $return .= $this->btn_login();
+        }else{
+            
+            $profile->ui->head("votre profile","gestion de vos droits d'utilisateur $profile->profile ");
+            if($session->admin()){
+                $profile = $this->§auth_profile->Read();
+                
+                $panel=$profile->__define_profile();
+                $profile->ui->footer($panel);
+                
+            }else{
+                $profile->ui->footer("vos droits sont définis par l'administrateur");
+            }
+            $return .= $profile->formular();
+        }
+        return $return; 
+    }
     
+    /*
     
     public function btn_profile(){
         $session = session();
@@ -144,17 +262,26 @@ class auth_user extends \xuserver\v5\model{
                 $this->update($_POST);
                 $this->read($session->id);
                 $this->form_profile();
-                $return .= $this->ui->structure();
+                //$return .= $this->ui->structure();
             }
-            $session->user($this);
+            
             $profile = $this->§auth_profile->Read();
-            $panel=$profile->define_profile();
+            
             $this->ui->head("votre profile","gestion de vos droits d'utilisateur $profile->profile ");
-            $this->ui->footer($panel);
+            if($session->admin()){
+                $session->user($this);
+                
+                $panel=$profile->__define_profile();
+                $this->ui->footer($panel);
+            }else{
+                $this->ui->footer("vos droits sont définis par l'administrateur");
+            }
+            
             $return .= $this->ui->form();
         }
         return $return; 
     }
+     */
     
     
     public function btn_logout(){
@@ -163,6 +290,7 @@ class auth_user extends \xuserver\v5\model{
             $return = $this->btn_login();
         }else{
             $session->kill();
+            echo systray("Logout done");
             $this->val(null);
             $return = $this->btn_login();
         }
@@ -255,7 +383,7 @@ class auth_user extends \xuserver\v5\model{
                           $Visitor->date_lastlog = date("Y-m-d H:i:s");
                           $Visitor->auth_logins = $Visitor->auth_logins +1;
                           $Visitor->update();
-                          $return = $Visitor->btn_account(); // display account formular
+                          $return = $Visitor->_menu(); // display account formular
                           $return.=notify("Bonjour $Visitor->my_firstname,<br/>Bienvenue dans votre espace utilisateur.","success clear");
                           echo "<div id='model-structure'>".$session->show()."</div>";
                       }
@@ -279,7 +407,7 @@ class auth_user extends \xuserver\v5\model{
           }
         }else{ // active session
             $this->read($session->id);
-            $return .= $this->btn_account();
+            $return .= $this->_menu();
         }
         
         $pinsession ="<div id='pinsession'>$session->name</div>";
@@ -390,7 +518,7 @@ class auth_user extends \xuserver\v5\model{
                 $p2="<p>Un code d'authentification vous sera demandé lors de votre prochaine connexion.</p>";
                 
             }else if($msg=="register_success"){
-                $title="modification du mot de passe";
+                $title="Bienvenue sur le service";
                 $p ="<p>Félicitations, vous êtes enregistré comme nouvel utilisateur.</p><p>Votre login est néanmoins bloqué.</p>";
                 $p1="<p>Veuillez trouver ci joint le code d'authentification qui vous sera demandé lors de votre prochaine connexion.</p>";
                 $p2="<p>$Visitor->check_code</p>";
@@ -411,7 +539,7 @@ class auth_user extends \xuserver\v5\model{
              
             // To send HTML mail, the Content-type header must be set
             $headers  = 'MIME-Version: 1.0' . "\r\n";
-            $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+            $headers .= 'Content-type: text/html; charset=utf-8' . "\r\n";
             $headers .= 'From: '.$from."\r\n".'Reply-To: '.$from."\r\n" . 'X-Mailer: PHP/' . phpversion();
             // Compose a simple HTML email message
             
@@ -422,9 +550,9 @@ class auth_user extends \xuserver\v5\model{
                 //echo debug("<h1>$Visitor->email</h1>" . $message);
                 $testsent = mail($to, $subject, $message, $headers);
                 if(! $testsent){
-                    echo notify("error mail");
+                    echo systray("SYS : error mail", "danger");
                 }else{
-                    echo notify("mail sent");
+                    
                 }                
             }else{
                 

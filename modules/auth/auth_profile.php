@@ -14,12 +14,112 @@ class auth_profile extends \xuserver\v5\model{
         
     }
     
+    public function formular($type="update"){
+        $session = session();
+        
+        // not admin mode !
+        if(! $session->admin()){
+            $this->methods()->select(0);
+            $this->properties()->find("#profile,description")->select()->disabled(1);
+            $this->ui->head("","");
+            $this->ui->footer("vous n'avez pas la possibilitÃ© de modifier cet objet");
+            return $this->ui->form();
+        }
+        // admin mode !
+        
+        $this->methods()->select(0);
+        $this->Â§update()->caption("description");
+        
+        if($session->logas()){ //session admin user using another profile
+            $this->Â§log_back()->select(1)->caption("back to admin")->bsClass("danger");
+            
+            if($session->logasProfile==$this->id_profile or $this->id_profile==XUSERVER_ADMIN_ID){
+                $this->Â§log_as()->select(1)->disabled(0);
+                $this->ui->head("","");
+            }else{
+                $this->Â§log_as()->select(1);
+                $this->ui->head("","");
+            }
+            
+        }else{
+            if($this->id_profile==XUSERVER_ADMIN_ID){
+                $this->Â§log_as()->disabled(1);
+            }else{
+                
+            }
+            $this->Â§log_back()->select(0);
+            $this->Â§log_as()->select(1);
+            $this->ui->head("","Liste des permissions du profile");
+        }
+        
+        $this->methods()->find("update")->select(1);
+        $this->methods()->find("defaults,defined")->select(1)->bsClass("btn-info");
+        $this->methods()->find("update,log_as,panel")->sort();
+        
+        
+        if($type=="update"){
+            $this->properties()->find("#profile,description")->select();
+            $this->ui->footer("");
+            $this->ui->head($this->title(),"Formulaire de description du profile");
+        }else if($type=="panel_defaults"){
+            $this->ui->head($this->title(),"Autorisations par dÃ©faut du profile");
+            $this->properties()->find("profile,may_")->select();
+            $this->Â§profile->required(1);
+        }else if($type=="panel_defined"){
+            $this->ui->head($this->title(),"Choix des autorisations du profile");
+            $this->properties()->find("profile")->select()->type("hidden");
+            $panel=$this->__define_profile();
+            $this->ui->footer($panel);
+        }
+        
+        return $this->ui->form();
+    }
+    
+    public function defaults(){
+        if(isset($_POST["may_update"])){
+            $this->update($_POST);
+        }
+        return $this->formular("panel_defaults");
+    }
+    public function defined(){
+        return $this->formular("panel_defined");
+    }
+    public function log_as(){
+        $session = session();
+        if($session->admin()){//do log as
+            $session->logas($this);
+            echo notify("You are now using <b>".$this->title()."</b> profile","info","LOG AS");
+            return $this->formular("update");
+        }else{
+            return "";
+        }
+    }
+    
+    public function log_back(){
+        $session = session();
+        if($session->admin()){
+            if($session->logas()){ //do log back
+                $profile = Build("auth_profile");
+                $profile->read($session->id_profile);
+                $session->logas($profile);
+                echo notify("You are now back into ADMIN profile","info","LOG AS");
+                return $this->formular("update");
+            }else{//do log as
+                return $this->log_as();
+            }
+        }else{
+            return "";
+        }
+    }
+    
     
     
     /** 
-     * écran de gestion des autorisations du profil courant.
+     * Meta Private method
+     * 
+     *  
      */
-    public function define_profile(){
+    public function __define_profile(){
         $return="";
         
         $permission = Build("auth_permission");
@@ -54,7 +154,7 @@ class auth_profile extends \xuserver\v5\model{
             $permission->__Key($key);
             $permission->fk_profile = $this->id_profile;
             
-            if(isset($temp_authorisations[$key])){ // le profile possède une autorisation sur le privilege
+            if(isset($temp_authorisations[$key])){ // le profile possï¿½de une autorisation sur le privilege
                 $db_id= $temp_authorisations[$key]["db_id"];
                 $permission->db_id($db_id);
                 $permission->__CRUD($temp_authorisations[$key]["crud"]);
@@ -74,7 +174,7 @@ class auth_profile extends \xuserver\v5\model{
                 }else if($permission->linestyle =="table"){
                     
                     $try = $permission->permModule;
-                    if( isset($temp_authorisations[$try]) ){// le profile ne possède pas d'autorisation pour le privilege de la Table, mais il en possède une pour le Module
+                    if( isset($temp_authorisations[$try]) ){// le profile ne possï¿½de pas d'autorisation pour le privilege de la Table, mais il en possï¿½de une pour le Module
                         $permission->__CRUD($temp_authorisations[$try]["crud"]);
                         
                     }else{
@@ -84,9 +184,9 @@ class auth_profile extends \xuserver\v5\model{
                 }else if($permission->linestyle =="method"){
                     
                     $try = $permission->permModule."-".$permission->permTable;
-                    if( isset($temp_authorisations[$try]) ){// le profile ne possède pas d'autorisation pour le privilege de la Methode, mais il en possède une pour la Table
+                    if( isset($temp_authorisations[$try]) ){// le profile ne possï¿½de pas d'autorisation pour le privilege de la Methode, mais il en possï¿½de une pour la Table
                         $permission->__CRUD($temp_authorisations[$try]["crud"]);
-                        //echo notify("$try autorisation heritée de la table" );
+                        //echo notify("$try autorisation heritï¿½e de la table" );
                     }else{
                         $permission->__CRUD("0000");
                     }
@@ -106,7 +206,7 @@ class auth_profile extends \xuserver\v5\model{
     
     
     /**
-     * création de la table virtuelle des privileges, lecture des tables de la DB et des méthodes des objets possédant une définition dans un fichier php.
+     * crÃ©ation de la table virtuelle des privileges, lecture des tables de la DB et des mï¿½thodes des objets possÃ©dant une dÃ©finition dans un fichier php.
      * @return string[]|mixed[]
      */
     private function load_privileges(){
@@ -129,10 +229,19 @@ class auth_profile extends \xuserver\v5\model{
             $sys_privileges[$key]=$key;
             $item->methods()->all(function($meth)use(&$sys_privileges,&$key){
                 $name = $meth->name();
+
                 if($name =="update" or $name =="delete" or $name =="create" or $name =="read" or $name =="formular" ){
-                }else{
+                    // controled by table privilege
+                    
+                }else if(strpos($name, "__") ===0){
+                    // private public methods, do not  
+                }else if(strpos($name, "_") ===0)  {
+                    // protected public methods, create a privilege on it 
                     $Key="$key-$name";
                     $sys_privileges[$Key]=$Key;
+                }else{
+                    // public public methods : no privilege, access to anybody, not controled
+                    
                 }
             });
         }
@@ -143,11 +252,12 @@ class auth_profile extends \xuserver\v5\model{
                 
                 if(isset($parts[1]) and ! isset($parts[2])){
                     $privTable=$parts[1];
-                    if( strpos($privTable,$module."_")===0 and $privModule!=$module){ // le nom de la table commence par le nom d'un module mais le module du privilège est différent (v5, par défaut) 
-                        // on renome la clef du privilège
+                    if( strpos($privTable,$module."_")===0 and $privModule!=$module){ // le nom de la table commence par le nom d'un module mais le module du privilï¿½ge est diffï¿½rent (v5, par dï¿½faut) 
+                        // on renome la clef du privilï¿½ge
                         $Key = "$module-$privTable";
                         $sys_privileges[$Key]=$Key;
                         unset($sys_privileges[$priv]);
+                        
                     }
                 }
             }
@@ -166,20 +276,11 @@ class auth_profile extends \xuserver\v5\model{
     public function __Authorisations(){
         $profile=$this;
         $profile->authorisations = array();
-        $profile->define_profile();
-        echo notify(count($profile->authorisations) . " autorisations loaded","secondary clear");
+        $profile->__define_profile();
+        
+        echo notify(count($profile->authorisations) . " autorisations loaded","secondary clear",$profile->title());
         return $profile->authorisations;
         
-        /*
-        $profile=$this;
-        $profile->permissions = $profile->permissions->Read();
-        
-        $profile->permissions->iterator()->each(function(\xuserver\v5\model $item)use(&$profile){
-            $profile->authorisations[$item->__Key()]=  $item->__CRUD();
-        });
-        echo notify(count($profile->authorisations) . " autorisations loaded","secondary clear");
-        return $profile->authorisations;
-        */
     }
     
 }

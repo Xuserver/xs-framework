@@ -123,22 +123,25 @@ class auth_permission extends \xuserver\v5\model{
         }
         
         if($type=="create"){
+            $link=xs_link("", $href, "__createProfilePermission('".$this->fk_profile."','$key')", $caption, "btn-outline-$bsline btn-block text-left font-weight-normal ", "click to add permission");
+            
             return "
         $separator
         <div class='d-flex flex-row' id=\"$uid\">
-            <div class='w-25 p-1'>
-                 <a href='$href' class='btn btn-outline-$bsline btn-block text-left font-weight-normal  xs-link' method=\"__createProfilePermission('".$this->fk_profile."','$key')\" >$caption</a>
+            <div class='col-sm-5 p-1'>
+                 $link
             </div>
             $buttons
         </div>";
             
         }else{
+            $link=xs_link("", $href, "__deleteProfilePermission('".$this->fk_profile."','$key')", $caption, "btn btn-$bsline   btn-block text-left font-weight-bold ", "click to remove permission");
             
             return "
         $separator
         <div class='d-flex flex-row ' id=\"$uid\"> 
-            <div class='w-25 p-1'>
-                <a href='$href' class='btn btn-$bsline   btn-block text-left font-weight-bold  xs-link' method=\"__deleteProfilePermission('".$this->fk_profile."','$key')\" >$caption</a>
+            <div class='col-sm-5 p-1'>
+                $link
             </div>
             $buttons
         </div>";
