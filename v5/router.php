@@ -80,16 +80,14 @@ if(count($_POST)>0){
         $method = $_POST["model_method"];
                 
         // auth preparation
-        
         $strpos = strpos($method, "(");
-        
         if($strpos===false){ // method name only
             $arguments="";
             $methodName = $method;
             $methodEval="$method()";
             //$method = $method;
              
-        }else{ // method with parenthesis and optinal arguments
+        }else{ // method with parenthesis and arguments
             $args=array();
             if( preg_match( '!\(([^\)]+)\)!', $method, $args ) );
             $arguments = $args[1];
@@ -98,13 +96,49 @@ if(count($_POST)>0){
             $method= $methodName;
         }
         $KeyTable = $obj->__module()."-".$obj->db_tablename();
-        $KeyMethod = $obj->__module()."-".$obj->db_tablename()."-$methodName";
-        $test = $session->can($KeyMethod);
+        $KeyMethod = "$KeyTable-$methodName";
+
+        $canUse = $session->can($KeyMethod);
+        $obj->auth($session);
         
-        if($test){
-            echo notify("$KeyMethod($arguments) $test","success");
+        /*
+        if($method=="append"){
+            //arguments contains "'db_tablename'"
+            $tablename= str_replace("'", "", $arguments);
+            $objRel = Build($tablename);
+            
+            $KeyTable = $objRel->__module()."-".$objRel->db_tablename();
+            $KeyMethod = "$KeyTable-create";
+            $canUse = $session->can($KeyMethod);
+            
+            $objRel->auth($session);
+            
+        }
+        */
+        
+        if($canUse){ // session can use method
+            
         }else{
-            echo notify("$KeyMethod($arguments) $test","danger");
+            
+            $exceptions = array("log_back", "defined", "defaults", "log_as");
+            if($session->logas()){
+                if(! in_array($methodName,$exceptions)  ){
+                    $message="current profile can't use <b>$KeyMethod</b> on <b>". $obj->db_tablename()."</b>";
+                    echo(systray($message,"info"));
+                    die(notify("ADMIN : $message","info","logas" ));
+                }else{
+                    echo (systray("Access granted to <b>$KeyMethod</b>, 'LOG AS'"));
+                }
+            }else{
+                echo (systray("ADMIN BYPASS to <b>$KeyMethod</b>"));
+            }
+            
+            if(!$session->admin()){
+                die(notify("Access denied to your current profile","danger"));
+            }else{
+                
+            }
+            //die( $beta);
         }
         
         if($method=="create"){
@@ -171,29 +205,19 @@ if(count($_POST)>0){
                 echo $obj->ui->killList();
                 echo $obj->ui->killTr();
             }
-            
-        }else if($method=="form"){
-            //$a= explode("-", $_POST["model_build"]);
-            //$obj = Build($a[0]);
-            //$obj->read($a[1]);
-            
-            if($obj->state()=="is_instance"){
-            }else{
-                //$obj=setSearchform($obj);
-            }
-            echo $obj->formular();
-            
         }else{
+            /*
             $a= explode("-", $_POST["model_build"]);
             $obj = Build($a[0]);
             $obj->read($a[1]);
-            
             if($session->can($KeyMethod)){
                 eval("echo \$obj->$methodEval;");
             }else{
                 eval("echo \$obj->$methodEval;");
             }
-
+            */
+            eval("echo \$obj->$methodEval;");
+            
             
         }
     }

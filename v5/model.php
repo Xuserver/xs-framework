@@ -1388,7 +1388,11 @@ class modelStructure extends iteratorItem{
     
     
     /**
-     * create model on database
+     * Constructor for model structure and children
+     * 
+     * @param database $db
+     * if no db given, the system will use the database defined in config.php file 
+     * 
      */
     public function __construct(database $db=null) {
         if(is_null($db)){
@@ -1401,11 +1405,27 @@ class modelStructure extends iteratorItem{
     }
     
     /**
-     * use overloading on model class to set instance property values using direct syntax :
-     * ex : change car color
-     * $car->color = 'blue' instead of
-     * $car->properties()->find('color')->val('blue')
+     * OVERLOADING
+     * Set instance property values using overloading
+     * This reduces the code to use to manipulate model "meta Properties"
+     * 
+     * USAGE  // change customer name on customer model
+     * // full syntax is
+     * $customer->properties()->find("customerName")->val("change the name");
+     *  
+     * // short syntax is
+     * $customer->customerName = "change the name"; 
+     * // meta tag syntax also working to set value     
+     * $customer->§customerName = "also change the name";
      *
+     * @param string $name
+     * The $name of the designated overloaded meta property
+     * note : you can also name properties using  "§"
+     * @param mixed $value
+     * Value given to the overloaded meta property
+     * @see property
+     * @see properties
+     *  
      */
     public function __set($name, $value){
         if(strpos($name, "§")===0 ){ // property
@@ -1424,15 +1444,25 @@ class modelStructure extends iteratorItem{
     
     
     /**
+     * OVERLOADING
+     * Return a the value of a "meta Property".
      * 
-     * overloading function
-     * create o retrieve the property object.
-     * otherwise ; set or retrieve the  property value.
+     * 
+     * USAGE 
+     * // using "§", the meta property itself is returned
+     * $prop = $customer->§customerName;
+     * $prop->val('change the value');
+     * // without "§", property::val() is returned 
+     * 
+     * 
      * @param string $name
+     * The name of the designated overloaded meta property
+     * note : When you use "§", the property is returned 
+     * note : When you do not use "§", the property value is returned 
      * @return \xuserver\v5\property |string
      */
     public function __get($name){
-        if(strpos($name, "§")===0 ){ // property
+        if(strpos($name, "§")===0 ){ // meta property
             
             $name = str_replace ( "§", "", $name);
             $property = $this->_properties->Fetch($name);
@@ -1460,9 +1490,9 @@ class modelStructure extends iteratorItem{
     }
     
     /**
-     *
-     * overloading function
-     * create o retrieve a method object.
+     * OVERLOADING
+     * 
+     * 
      * otherwise ;
      * @param string $name
      * @return \xuserver\v5\property|string
@@ -1494,12 +1524,16 @@ class modelStructure extends iteratorItem{
     }
     
     /**
+     * OVERLOADING
+     * 
+     * 
      * @todo reflechir a son emploi
      * @return \xuserver\v5\iterator
      */
     public function __invoke(){
         return $this->_iterator;
     }
+    
     
     /**
      * Pseudo namespace the Model belongs to
@@ -1512,16 +1546,25 @@ class modelStructure extends iteratorItem{
      * @return string
      */
     public function __module(){
-        /*
-        $class= get_class($this);
-        $arr=explode("\\", $class);
-        return $arr[count($arr)-2];
         
-        */
         if($this->_module=="__EMPTY__"){
-          $class= get_class($this);
-          $arr=explode("\\", $class);
-          $this->_module = $arr[count($arr)-2];
+            $class= get_class($this);
+            $arr=explode("\\", $class);
+            $this->_module = $arr[count($arr)-2];
+            
+            
+            if( strpos($this->db_tablename,"_") !==false ){ // il est possible que le modèle doivnet appartenir à un module, mais aucune classe métier n'est définie
+                $partsInName = explode("_",$this->db_tablename);
+                $pathToSupposedModuleDir = $_SERVER["DOCUMENT_ROOT"]."/xs-framework/modules/".$partsInName[0];
+                if(is_dir($pathToSupposedModuleDir)) {
+                    $this->_module = $partsInName[0];
+                    //echo systray( "v5 model $this->db_tablename in fact belongs to " . $this->_module);
+                }
+            }
+            
+            
+            
+            
         }else{
             
         }
@@ -1661,7 +1704,7 @@ class modelStructure extends iteratorItem{
      * // return 'customer-1'
      * 
      * EXAMPLES
-     * #Model_href
+     * ex#Model_href
      * 
      * @see router.php
      * @see \xs_encrypt()
@@ -1866,7 +1909,7 @@ class model extends modelEvents{
      * $Class->build('customer');
      * 
      * EXAMPLES
-     * #Model_build
+     * ex#Model_build
      * 
      * @param string $db_tablename
      * The name of the table to Modelize
@@ -2025,7 +2068,7 @@ class model extends modelEvents{
      * Get or Set the Model instance "title"
      * 
      * EXAMPLES
-     * #Model_title
+     * ex#Model_title
      * 
      * @param string $set
      * @return \xuserver\v5\model | string | boolean | string
@@ -2101,8 +2144,8 @@ class model extends modelEvents{
      * // form submit
      * $customer->val($_POST);  
      * EXAMPLE
-     * #Model_val_array
-     * #Model_val_object
+     * ex#Model_val_array
+     * ex#Model_val_object
      * @param mixed $values
      * - Retrieve model property values in a stdClass object 
      * - null : set properties to null (reset object)
@@ -2406,6 +2449,53 @@ class model extends modelEvents{
     }
     
     
+    public function auth($session=null){
+        
+        if(is_null($session)){
+            $session= session();
+            
+        }
+        $KeyPerm = $this->__module()."-".$this->db_tablename();
+        
+        if (isset($session->authorisations[$KeyPerm])) {
+            $crud = $session->authorisations[$KeyPerm];
+            
+            if($crud[0]=="0"){
+                $this->§create()->disabled(1);
+            }else{
+                $this->§create()->disabled(0);
+            }
+            
+            if($crud[1]=="0"){
+                $this->§read()->disabled(1);
+            }else{
+                $this->§read()->disabled(0);
+            }
+            
+            if($crud[2]=="0"){
+                $this->§update()->disabled(1);
+            }else{
+                $this->§update()->disabled(0);
+            }
+            
+            if($crud[3]=="0"){
+                $this->§delete()->disabled(1);
+            }else{
+                $this->§delete()->disabled(0);
+            }
+            
+            
+            echo systray("AUTH <b>$KeyPerm</b> $crud ","danger");
+            
+        }else{
+            echo systray("AUTH <b>$KeyPerm</b> unknown ","warning");
+            
+        }
+        
+        return $this;
+        
+    }
+    
     
     
     
@@ -2435,7 +2525,7 @@ class properties extends iterator{
      * EXAMPLE
      * $customer->properties()->find("phone")->select(); 
      *
-     * #props_select
+     * ex#props_select
      * @return \xuserver\v5\properties
      */
     public function select(){
@@ -2454,10 +2544,9 @@ class properties extends iterator{
      * Then assing them to WHERE statement, using where()
      * 
      * EXAMPLE
-     * 
      * $customer->properties()->find("phone")->select()->where(); 
      *
-     * #props_select
+     * ex#props_select
      * @return \xuserver\v5\properties
      */
     public function where($andor="AND"){
@@ -3115,7 +3204,8 @@ class method extends iteratorItem{
     private $_caption = "__NULL__";
     private $_bsclass = "__NULL__";
     private $_formmethod = "post";
-
+    private $is_disabled=false;
+    
     
     public function __construct(){
         $this->ui=new method_ui($this);
@@ -3126,6 +3216,24 @@ class method extends iteratorItem{
     public function select($set=1){
         $this->is_selected("$set");
         return $this;
+    }
+    
+    public function disabled($set=null){
+        if(is_null($set)){
+            return $this->is_disabled;
+        }else{
+            $this->is_disabled=$set;
+            return $this;
+        }
+        /*
+        if($set!=3){
+            if($set ==0){$set="0";}else{$set="1";}
+            $this->is_disabled=$set;
+            return $this;
+        }else{
+            return $this->is_disabled;
+        }
+        */
     }
     
     public function caption($set="__NULL__"){
@@ -3416,12 +3524,12 @@ class model_ui{
                         $tbody.="";
                     }else{
                         if($prop->is_primarykey() ){
-                            $button = xs_link("", $item->href() , "form", "#".$prop->val(), "btn text-primary border-primary", "");
+                            $button = xs_link("", $item->href() , "formular", "#".$prop->val(), "btn text-primary border-primary", "");
                             $tbody.="<td>".$button."</td>";
                             
                             //$tbody.="<td>".$item->button("#".$prop->val(), "form", "","")."</td>";
                         }else if($prop->type()=="fk"){
-                            $button = xs_link("", $prop->db_foreigntable() ."-".$prop->val(), "form", "#".$prop->val(), "btn border-secondary", "");
+                            $button = xs_link("", $prop->db_foreigntable() ."-".$prop->val(), "formular", "#".$prop->val(), "btn border-secondary", "");
                             $tbody.="<td>".$button."</td>";
                             
                             
@@ -3464,7 +3572,7 @@ class model_ui{
         
         if(!$passthru){
           if(!$session->admin()){
-              return notify("Acces denied, can't display structure","light clear");
+              return "";
           }
         }
         
@@ -3751,6 +3859,10 @@ class method_ui{
         $caption = $this->parent->caption();
         $bsclass= $this->parent->bsclass();
         $formmethod = $this->parent->formmethod();
+        $disabled = $this->parent->disabled();
+        if($disabled){
+            return "<input type='button' value='$caption' class='btn $bsclass' disabled='disabled' title='$formmethod $caption' />  ";
+        }
         if($formmethod=="post"){
             return "<input type='submit' method='$method' formmethod='$formmethod' value='$caption' class='btn $bsclass' title='$formmethod $caption' />  ";
         }else{

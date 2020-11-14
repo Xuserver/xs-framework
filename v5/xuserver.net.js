@@ -48,10 +48,26 @@ var xsRouter = "/xs-framework/v5/router.php";
 
 var $myScreen = "";
 var xsNotifications;
+var xsSystray;
 var xsSpinner;
 function xsLayout(){
     xsNotifications = $("<div style='z-index:9999; position: fixed; right:0; padding-top:5px; width:300px; min-height:1px;' />")
     $("body").prepend(xsNotifications);
+    
+    xsSystray = $("<div class='rounded-top bg-light shadow p-3' style='z-index:9999; position: fixed; bottom:0; right:0; padding-top:5px;  min-height:1px; background:#FFFFFF'></div>")
+    xsSystray.icon = $("<a href='javascript:void(0)'class='btn btn-link'>system</a>").click(function(){
+    	xsSystray.hide()
+    });
+    xsSystray.trash = $("<a href='javascript:void(0)' class='btn btn-link'>empty</a>").click(function(){
+    	xsSystray.find(".xs-systray").remove();
+    	xsSystray.hide()
+    });
+    xsSystray.prepend(xsSystray.icon,xsSystray.trash);
+    
+    //xsSystray= $("<div style='z-index:9999; position: fixed; left:0; padding-top:5px; width:300px; min-height:1px;' />")
+    $("body").prepend(xsSystray);
+    
+    
     xsSpinner = $("<div style='z-index:9999; position: fixed; margin:5px 5px 5px 5px;' class='spinner-border sticky-top float-center text-danger' role='status'>      <span class='sr-only'>Loading...</span>   </div>")
     $('body').prepend(xsSpinner)
     
@@ -70,6 +86,7 @@ $( document ).ready(function() {
 	    ajaxResponse($("body"));
         xsSpinner.hide()
         xsNotifications.show()
+        xsSystray.hide();
 	});
 	
 });
@@ -193,14 +210,28 @@ function ajaxResponse(html){
     if($html.find(".xs-notify.clear").length != 0 ){
     	xsNotifications.find(".xs-notify").remove();
     }
-    $html.find(".xs-notify").each(function() {
+    $html.find(".xs-notify, .xs-systray").each(function() {
         var $notification = $(this);
-        xsNotifications.prepend($notification.fadeIn());
-        $notification.click(function(){
-            $notification.remove()
-        });
-        setTimeout(function(){ $notification.fadeOut(400, function(){$notification.remove();}) }, 5000);
+        if($notification.hasClass("xs-notify")){
+        	xsNotifications.prepend($notification.fadeIn());
+            $notification.click(function(){
+                $notification.remove()
+            });
+            setTimeout(function(){ $notification.fadeOut(400, function(){$notification.remove();}) }, 5000);
+        }else{
+        	xsSystray.prepend($notification.fadeIn());
+        	$notification.find(".xs-systray-clicker").click(function(){
+                $notification.remove()
+            });
+        	xsSystray.prepend(xsSystray.icon,xsSystray.trash);
+        	$notification.click(function(){
+                xsSystray.hide()
+            });
+        	xsSystray.show()
+        }
     });
+    
+    
     console.log(".xs-debug")
     $html.find(".xs-debug").each(function() {
         var $notification = $(this);
@@ -315,7 +346,7 @@ function $ajaxForm($form){
 
 function $ajaxFormFile(input) {
 	
-	var btnSelectFile =  $("<input type='button' class='btn btn-primary xs-fn-filedropper' value='Select file' /> ").click(function(){
+	var btnSelectFile =  $("<input type='button' class='btn btn-light xs-fn-filedropper' value='Select file' /> ").click(function(){
 		var me = $(this);
 		input.click()
 	});
@@ -330,7 +361,7 @@ function $ajaxFormFile(input) {
 	function randomtag() {
 	    return Math.round(+new Date() / 1000);
 	}
-	var btnViewFile =  $("<input type='button' class='btn btn-outline-primary' value='open' />").click(function(){
+	var btnViewFile =  $("<input type='button' class='btn btn-outline-secondary' value='open' />").click(function(){
 		var me = $(this);
 		var body = $("body");
 		var frame = $ ("<div><iframe src='"+xsRouter+"?file="+input.attr("title")+"' style='border:0;width:100%;min-height:80vh;'/></div>").appendTo(body)
@@ -350,12 +381,12 @@ function $ajaxFormFile(input) {
 		var filedrag = btnSelectFile;
 		$("html").on("dragover", function(e) {
             e.preventDefault(); e.stopPropagation();
-            filedrag.removeClass('btn-primary').addClass('btn-success');
+            filedrag.removeClass('btn-light').addClass('btn-success');
             btnSelectFile.val("Drag here");
         });
 		$("html").on("drop", function(e) {
 			e.preventDefault(); e.stopPropagation();
-			$("input.xs-fn-filedropper").val("Select file").removeClass('btn-success').addClass('btn-primary');
+			$("input.xs-fn-filedropper").val("Select file").removeClass('btn-success').addClass('btn-light');
 			
 		});
 		
@@ -373,7 +404,7 @@ function $ajaxFormFile(input) {
 		// Drop
 		filedrag.on('drop', function(e) {
 			e.stopPropagation(); e.preventDefault();
-			$("input.xs-fn-filedropper").val("select file").removeClass('btn-warning').removeClass('btn-success').addClass('btn-primary');
+			$("input.xs-fn-filedropper").val("select file").removeClass('btn-warning').removeClass('btn-success').addClass('btn-light');
 			//btnSelectFile.val("Dropped");
 			var file = e.originalEvent.dataTransfer.files;
 			input.prop('files', e.originalEvent.dataTransfer.files);
@@ -462,7 +493,7 @@ function $ajaxResponseDispatchNode(element){
 }
 
 function scrollTo(element){
-	if(element.prop("tagName")=="FORM"){
+	if(element.prop("tagName")=="FORM" || element.prop("tagName")=="DIV"){
 		element[0].scrollIntoView();
 	}
 }

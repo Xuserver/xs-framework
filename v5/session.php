@@ -1,7 +1,7 @@
 <?php
 
 
-//use xuserver\v5\model;
+use xuserver\modules\auth\auth_profile as auth_profile;
 
 
 
@@ -87,7 +87,7 @@ class session {
     var $authorisations = array();
     var $duration = 0;
     private $last = 0;
-    var $logas = 0; // is admin logged as another user
+    
     function __construct() {
         
     }
@@ -135,46 +135,176 @@ class session {
         $this->authorisations = $user->§auth_profile->Read()->__Authorisations();
         $this->save();
     }
-    function authorisations($profile){
+    
+    
+    var $logas = 0; // is admin logged as another user
+    var $logasProfile = "";
+    function logas(auth_profile $profile=null){
+        if(is_null($profile)){ // no profile given, return logas state
+            return $this->logas;
+        }
+        
+        if($profile->id_profile == $this->id_profile){ // logback into admin account
+            $this->logas=0;
+            $this->logasProfile=$this->id_profile;
+        }else{
+            $this->logas=1;
+            $this->logasProfile=$profile->id_profile;
+        }
         $this->authorisations = $profile->__Authorisations();
         $this->save();
+        
     }
+    
     function show() {
         $prop = "";
         $ret = "";
-        foreach ($this as $k => $v) {
-            if ($k == "authorisations" or $k == "last") {
-                continue;
-            }
-            $prop .= "<li class='text-primary' style='cursor:pointer'><span>$k $v</span></li>";
+        if(! $this->admin()){
+            $avoid = array("id","id_profile","logas","logasProfile", "authorisations","last");
+            $isadmin=false;
+        }else{
+            $avoid = array("authorisations","last");
+            $isadmin=true;
         }
         
+        if($this->logas()){
+            $badge="<span class='badge badge-warning'>log as</span>";
+            $href="auth_user-$this->id";
+            $back ="<div class='form-group '>".xs_link("",$href, "__log_back", "Log Back","btn-light")."</div>";
+            
+        }else{
+            $badge="";
+            $back="";
+        }
+        foreach ($this as $k => $v) {
+            if (in_array($k, $avoid)) {
+                continue;
+            }
+            $prop .= "
+            <div class='form-group row'>
+                <label class='col-sm-3 col-form-label'>$k</label>
+                <div class='col'>
+                    <input type='text' class='form-control' value='$v' disabled='disabled' />
+                </div>
+            </div>
+            ";
+        }
         foreach ($this->authorisations as $k => $v) {
             
+            $kp=explode("-", $k);
+            if(isset($kp[2])){
+                $u="";$r="";$d="";
+                $c=$this->pline($v[2],"U");
+                $test = $v[2];
+                $bsClass="text-warning";
+                $caption ="$k()";
+            }else{
+                $c=$this->pline($v[0],"C");
+                $r=$this->pline($v[1],"R");
+                $u=$this->pline($v[2],"U");
+                $d=$this->pline($v[3],"D");
+                $test = $v[0]+$v[1]+$v[2]+$v[3];
+                if(!isset($kp[1])){
+                    $bsClass="text-dark";
+                    $caption ="{"."$k}";
+                }else{
+                    $bsClass="text-primary";
+                    $caption ="[$k]";
+                }
+            }
             
-            $ret .= "<li class='text-success' style='cursor:pointer'><span>$k " . $v . "</span></li>";
+            if(! $isadmin and $test<1){
+                continue;
+            }
+            $ret .= "
+            <div class='form-group row'>
+                <div class='col-sm-5 col-form-label $bsClass'>$caption</div>                
+                <div class='col-sm-2'>$c$r$u$d</div>                
+            </div>";
         }
-        return "<li><span>SESSION</span><ul>$prop</ul></li><li><span>PERMISSIONS</span><ul>$ret</ul></li>";
+        return "
+            <div class='accordion'>
+                <h4 class='btn btn-light' data-toggle='collapse' href='#form-session-1' >SESSION</h4><div class='collapse show' id='form-session-1' >$prop $back</div>
+                <h4 class='btn btn-light' data-toggle='collapse' href='#form-session-2' >PERMISSIONS $badge</h4> <div class='collapse ' id='form-session-2' >$ret</div>
+            </div>";
+        
     }
     
-    function modules(){
-        $menu="";
+    private function pline($v,$c){
+        if($v=="1"){
+            return "<span class='btn btn-success' >$c</span>";
+        }else{
+            return "<span class='btn btn-light' >$c</span>";
+        }
+        
+    }
+    
+    function modules($user=null){
         $permission = Build("auth_permission");
-        $href="auth_user-$this->id";
+        
+        
+        if(!is_null($user)){
+            $href="auth_user-$user->id_user";
+        }else{
+            $href="auth_user-$this->id";
+        }
+        
+        //$href="auth_user-$this->id";
+        
+        
+        if($this->admin()){
+            $admin_menu = "<div class='dropdown-divider'></div>";
+            if($this->logas()){
+                $admin_menu .=xs_link("",$href, "__log_back", "Log Back","dropdown-item");
+            }else{
+                $admin_menu .=xs_link("",$href, "_log_as", "Log As","dropdown-item");
+            }
+        }else{
+            $admin_menu="";
+        }
+        $menu ="<div class='btn-group '>
+                        <button type='button' class='btn btn-light dropdown-toggle' data-toggle='dropdown' aria-haspopup='true' aria-expanded='false'>
+                            Account
+                        </button>
+                        <div class='dropdown-menu'>"
+                            .xs_link("",$href, "_menu", "Menu","dropdown-item")
+                            .$admin_menu
+                            ."<div class='dropdown-divider'></div>"
+                            .xs_link("",$href, "btn_account", "Contact","dropdown-item")
+                            .xs_link("",$href, "btn_profile", "Profile","dropdown-item")
+                            ."<div class='dropdown-divider'></div>"
+                            .xs_link("",$href, "btn_session", "Session","dropdown-item ")
+                            .xs_link("",$href, "btn_logout", "Log out","dropdown-item ")
+                        ."</div>
+                    </div>";
         
         foreach ($this->authorisations as $key=>$crud){
             $permission->__Key($key);
             $permission->__CRUD($crud);
             if($permission->linestyle=="module" ){
-                $menu .= xs_link("", $href, "__session_tables('$permission->permModule')", $permission->permModule, "list-group-item list-group-item-action list-group-item-primary", "click to list instances");
-                
-                $menu .="<div id='session-modules-$permission->permModule-uid' class='list-group'></div>";
-                
+                $items=$this->tables($permission->permModule);
+                if($items!=""){
+                    //$refresh = xs_link("", $href, "__session_tables('$permission->permModule')", $permission->permModule, "btn btn-light dropdown-toggle", "click to list instances");
+                    $menu .="
+                    
+                        <div class='btn-group '>
+                            <button type='button' class='btn btn-light dropdown-toggle' data-toggle='dropdown' aria-haspopup='true' aria-expanded='false'>
+                                $permission->permModule
+                            </button>
+                            <div class='dropdown-menu'>
+                                $items            
+                            </div>
+                        </div>
+                    ";
+                }
                 
             }
         }
-        return "<div id='session-modules-uid' class='list-group'>$menu</div>" ;
+        return "<div id='session-modules-uid' class=''>$menu</div>" ;
     }
+    
+    
+    
     function tables($module){
         $menu="";
         $permission = Build("auth_permission");
@@ -184,10 +314,13 @@ class session {
             if($permission->__can("read") and $permission->linestyle=="table" and  $permission->permModule==$module){
                 $caption = str_replace("_"," ",$permission->permTable);
                 $caption = str_replace($permission->permModule,"",$caption);
-                $menu .= xs_link("", $permission->permTable, "read", $caption, "list-group-item list-group-item-action", "click to list instances");
+                $menu .= xs_link("", $permission->permTable, "read", $caption, "dropdown-item", "click to list instances");
             }
         }
-        return "<div id='session-modules-$module-uid' class='list-group'>$menu</div>" ;
+        if($menu==""){
+            return "" ;
+        }
+        return "$menu" ;
     }
     
     function admin(){
@@ -204,7 +337,7 @@ class session {
     }
     
     /**
-     * can the session di something ? 
+     * can the session do something ? 
      * @param string $Key
      * @return boolean
      */
@@ -220,28 +353,38 @@ class session {
                 
         if($privMethod=="create" or  $privMethod=="update" or $privMethod=="read" or $privMethod=="delete"){
             $authKey = "$permission->permModule-$permission->permTable";
-            $CAN = $privMethod; 
+            $CAN = $privMethod;
+            $tray = "SESSION <b>$privMethod</b> CRUD functionalities $Key";
+            
+        }else if($privMethod=="form" or  $privMethod=="formular"){
+            $authKey = "$permission->permModule-$permission->permTable";
+            $CAN = "update";
+            $tray = "SESSION <b>$privMethod</b> FORM functionalities $Key";
+            
+        //}else if($privMethod=="append"){
+            
         }else{
             $authKey = $Key;
             $CAN = "use";
+            $tray = "SESSION <b>$privMethod</b> USE functionalities $Key";
         }
         
         if (isset($this->authorisations[$authKey])) {
             $permission->__CRUD($this->authorisations[$authKey]);
             $return = $permission->__can($CAN);
-        }else{
-            $return = 0;
-        }
-        if ($return) {
+            echo systray("$tray = $return");
             
         }else{
+            //echo systray("$this->logas supposed to functionality $Key");
             
+            $return = 1;
         }
+        
         
         
         return $return;
     }
-    
+    /*
     function can1($Key="__NULL__") {
         if($Key=="__NULL__" or is_null($Key)){
             return false;
@@ -285,7 +428,7 @@ class session {
             return false;
         }
     }
-    
+    */
     /**
      * @deprecated
      */
@@ -308,7 +451,7 @@ class session {
     /**
      * @deprecated
      */
-    function logAs($bool="") {
+    function old_logAs($bool="") {
         if($bool==""){ // getter
         }else{
             $this->logAs = $bool;

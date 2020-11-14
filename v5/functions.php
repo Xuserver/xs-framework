@@ -73,12 +73,27 @@ function debug($s,$echo=false){
  * @param string $class
  * @return string
  */
-function notify($s,$class="warning"){
-    $id="xs-info-".rand();
-    $alert = "<div id='$id' class='xs-notify  alert alert-$class' style='display:none; user-select: none; cursor:pointer;'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button><h6>notification</h6> $s </div>";
+function notify($text,$class="warning",$title="notification"){
+    $id="xs-notify-".rand();
+    $alert = "<div id='$id' class='xs-notify  alert alert-$class' style='display:none; user-select: none; cursor:pointer;'> <button type='button' class='close' data-dismiss='alert' aria-label='Close'><span aria-hidden='true'>&times;</span></button><h6>$title</h6> $text </div>";
     return $alert;
 }
-
+/**
+ * Show an admin notification message
+ * @param string $s
+ * @param string $class
+ * @return string
+ */
+function systray($s,$class="info"){
+    
+    $session = session();
+    if (!$session->admin()){
+        return "";
+    }
+    $date = date("y/m/d H:i:s");
+    $alert = "<div class='xs-systray ' style='display:none; user-select: none; cursor:pointer;'><small class='xs-systray-clicker' >$date</small><small class='text-$class'> $s </small></div>";
+    return $alert;
+}
 
 /**
  * decrypt $_POST keys
@@ -95,7 +110,9 @@ function _DECRYPT_POST(){
     foreach($_POST as $key => $val){
         if($key=="model_build"){
             $new_POST[$key] = xs_decrypt($val) ;
-        }else if($key=="model_method"){
+        }else if($key=="model_method" ){
+            $new_POST[$key] = $val ;
+        }else if($key=="ids"){
             $new_POST[$key] = $val ;
         }else{
             $new_POST[xs_decrypt($key)] = $val ;
