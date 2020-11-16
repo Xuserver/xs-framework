@@ -203,7 +203,7 @@ class auth_user extends \xuserver\v5\model{
                 }
                 */
                 
-                $go = xs_link("", $profile->href(), "form", "Ouvrir la fiche profile profile","btn btn-link");
+                $go = xs_link("", $profile->href(), "formular", "Ouvrir la fiche profile","btn btn-link");
                 $this->ui->footer("<a class='btn btn-warning' data-toggle='collapse' href='#form-session-1' >details</a> $go");
             }else{
                 

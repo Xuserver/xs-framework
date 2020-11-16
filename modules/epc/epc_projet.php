@@ -23,6 +23,7 @@ class epc_projet extends \xuserver\v5\model{
         return $return;
     }
     
+    /*
     public function test($test="no args"){
         echo notify("youy launched $this->name $test");
     }
@@ -30,7 +31,7 @@ class epc_projet extends \xuserver\v5\model{
     public function btn_lots(){
         echo notify("you clicked a button ".$this->name);
     }
-    
+    */
     private function __listlots(){
         $collection = $this->relations()->Fetch("epc_lot");
         $selection = $collection->Read();

@@ -5,6 +5,8 @@
  **/
 
 
+/** GLOBAL VARS **/
+//$auth_build=false;
 
 /** GLOBAL FUNCTIONS **/
 
@@ -18,7 +20,6 @@ function BuildClass($module,$tablename){
     $Class=null;
     $chain = "\$Class = new \xuserver\modules\\$module\\$tablename"."();";
     eval($chain);
-    
     if( is_null($Class)){
         $Class = new \xuserver\v5\model();
     }else{
@@ -33,6 +34,7 @@ function BuildClass($module,$tablename){
  * @return \xuserver\v5\model
  */
 function Build($tablename){
+    //global $auth_build;
     $Class=null;
     $dir = $_SERVER["DOCUMENT_ROOT"]."/xs-framework/modules";
     $elts = scandir($dir, 1);
@@ -42,12 +44,14 @@ function Build($tablename){
             if(is_file($dir."/$module/$tablename.php")){
                 $Class= BuildClass($module,$tablename);
                 $Class->build($tablename);
+                //if($auth_build){$Class->auth();}
                 return $Class;
             }
         }
     }
     $Class = new \xuserver\v5\model();
     $Class->build($tablename);
+    //if($auth_build){$Class->auth();}
     return $Class;
 }
 

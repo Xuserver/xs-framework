@@ -2448,12 +2448,30 @@ class model extends modelEvents{
         return $dir;
     }
     
-    
-    public function auth($session=null){
+    /**
+     * is the model controled by auth module
+     * if true relations and foreign keys models are build with auth()
+     * if false relations and foreign keys models are build with full CRUD access  
+     * @var boolean
+     */
+    public $auth_applyed=false; // is auth already applyed
+    public $auth_apply=false; // must auth be applyed on relations and so on
+    public $auth_create=true; // can session create this model ?
+    public $auth_read=true; // can session read this model ?
+    public $auth_update=true; // can session update this model ?
+    public $auth_delete=true; // can session delete this model ?
+    /**
+     * applies the auth module on the model, its relations and foreign keys
+     * @param \session $session
+     * @return \xuserver\v5\model
+     */
+    public function auth(\session $session=null){
+        $this->auth_apply=true;
+        // is auth already applyed
+        if($this->auth_applyed){return $this;}
         
         if(is_null($session)){
             $session= session();
-            
         }
         $KeyPerm = $this->__module()."-".$this->db_tablename();
         
@@ -2462,28 +2480,35 @@ class model extends modelEvents{
             
             if($crud[0]=="0"){
                 $this->§create()->disabled(1);
+                $this->auth_create=false;
             }else{
                 $this->§create()->disabled(0);
+                $this->auth_create=true;
             }
             
             if($crud[1]=="0"){
                 $this->§read()->disabled(1);
+                $this->auth_read=false;
             }else{
                 $this->§read()->disabled(0);
+                $this->auth_read=true;
             }
             
             if($crud[2]=="0"){
                 $this->§update()->disabled(1);
+                $this->auth_update=false;
             }else{
                 $this->§update()->disabled(0);
+                $this->auth_update=true;
             }
             
             if($crud[3]=="0"){
                 $this->§delete()->disabled(1);
+                $this->auth_delete=false;
             }else{
                 $this->§delete()->disabled(0);
+                $this->auth_delete=true;
             }
-            
             
             echo systray("AUTH <b>$KeyPerm</b> $crud ","danger");
             
@@ -2491,6 +2516,8 @@ class model extends modelEvents{
             echo systray("AUTH <b>$KeyPerm</b> unknown ","warning");
             
         }
+        
+        $this->auth_applyed=true;
         
         return $this;
         
@@ -3162,7 +3189,14 @@ class relation extends iteratorItem{
             $dual=Build($tablename);
             $dual->properties()->Fetch($this->_type)->val($this->_value);
             $dual->properties()->select()->where();
-            $dual->read();
+            
+            if($this->Model->auth_apply){
+                $dual->auth();
+            }
+            if($dual->auth_read){
+                $dual->read();
+            }
+            
             $dual->Model = $this->Model;
             return $dual;
         }else{
@@ -3177,14 +3211,22 @@ class relation extends iteratorItem{
      */
     public function Create(){
         
-        if($this->Model->state()=="is_instance"){
+        if($this->Model->state()=="is_instance"){// the model is an instance
             $tablename = $this->name();
             $dual=Build($tablename);
             $dual->properties()->Fetch($this->_type)->val($this->_value);
-            //$dual->properties()->select()->where();
-            $newItem = $dual->create();
-            $newItem->Model = $this->Model;
-            return $newItem;
+            if($this->Model->auth_apply){
+                $dual->auth();
+            }
+            if($dual->auth_create){
+                $newItem = $dual->create();
+                $newItem->Model = $this->Model;
+                return $newItem;
+            }else{
+                $dual->Model = $this->Model;
+                return $dual;
+            }
+            
         }else{
             return $this->Model;
         }

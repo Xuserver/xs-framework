@@ -8,7 +8,7 @@ include $_SERVER["DOCUMENT_ROOT"]."/xs-framework/v5/config.php";
                                 GETTING SESSION 
  ************************************************************************************/
 $session = session();
-
+//$auth_build=true;
 
 /************************************************************************************ 
                                 GET ACTIONS 
